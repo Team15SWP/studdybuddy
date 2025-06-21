@@ -46,7 +46,7 @@ async def read_root(request: Request):
 async def generate_task(topic: str, difficulty: str):
     prompt = (
         f"Create one Python programming task on '{topic}' with '{difficulty}' difficulty. "
-        "Respond with only the task description. Include a sample input and expected output to illustrate the task."
+        "Respond with with a JSON object with fields: Task name, Task description, 3 Sample input cases, Expected outputs for the test cases, Hints. Make 3 hints to help solve this task. Do not include additional comments"
     )
 
     try:
@@ -68,6 +68,7 @@ async def generate_task(topic: str, difficulty: str):
 async def evaluate_code(request: Request):
     try:
         data = await request.json()
+        print("Received data:", data)
         task_description = data.get('task', '')
         user_code = data.get('code', '')
 
@@ -75,8 +76,8 @@ async def evaluate_code(request: Request):
             f"Task:\n{task_description}\n\n"
             f"User solution:\n```python\n{user_code}\n```\n\n"
             "Analyze the above code for correctness against the task requirements. "
-            "Respond with a JSON object with fields: 'correct': true or false, 'feedback': a brief explanation."
-        )
+            "Respond with a JSON object with fields: 'correct': true or false, 'feedback': a brief explanation (only if correct is false, if true - make a compliment). Do not include additional comments"
+        ) 
 
         result = call_openrouter(eval_prompt)
         evaluation = result['choices'][0]['message']['content'].strip()
