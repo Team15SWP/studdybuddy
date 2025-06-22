@@ -84,3 +84,6 @@ async def evaluate_code(request: Request):
 
     except Exception as e:
         return JSONResponse({'error': str(e)}, status_code=500)
+
+from auth_routes import router as auth_router
+app.include_router(auth_router)
