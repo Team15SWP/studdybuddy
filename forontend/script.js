@@ -101,12 +101,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  //Function to clear chat messages
+  function clearChat() {
+    messagesBox.innerHTML = '';
+    taskShown = false;
+    answerSent = false;
+    hintBtn.disabled = true;
+    if (quoteBlock) quoteBlock.style.display = 'none';
+  }
+
   const handleTopic = li => {
     if (!syllabusLoaded) return;
     hideQuote();
     document.querySelectorAll('.sidebar li').forEach(e => e.classList.remove('active-topic'));
     li.classList.add('active-topic');
     selectedTopic = li.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+    clearChat();
     hintBtn.disabled = true;
     showMessage(li.textContent, 'user');
     showMessage('Select difficulty 👇', 'bot');
@@ -138,14 +148,36 @@ document.addEventListener('DOMContentLoaded', () => {
     userForm.classList.add('hidden');
   });
 
-  userForm.addEventListener('submit', e => {
-    e.preventDefault();
-    const name = document.getElementById('user-name-input').value.trim();
-    const mail = document.getElementById('user-email-input').value.trim();
-    const pwd = document.getElementById('user-password-input').value.trim();
-    if (!name || !mail || !pwd) return;
-    finishLogin(name, false);
+userForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = document.getElementById('user-name-input').value.trim();
+  const mail = document.getElementById('user-email-input').value.trim();
+  const pwd = document.getElementById('user-password-input').value.trim();
+  if (!name || !mail || !pwd) return;
+
+  const formData = new URLSearchParams();
+  formData.append('email', mail);
+  formData.append('login', name);
+  formData.append('password', pwd);
+
+  const res = await fetch('/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData
   });
+
+
+const text = await res.text();
+console.log('STATUS:', res.status);
+console.log('RESPONSE:', text);
+
+if (res.ok) {
+  finishLogin(name, false);
+} else {
+  alert(`❌ Registration failed: ${text}`);
+}
+});
+
 
   adminForm.addEventListener('submit', e => {
     e.preventDefault();
@@ -244,13 +276,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
     showMessage(labels[level], 'user');
     showMessage('Generating task…', 'bot');
-    const task = await fetchText(
-      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`,
-      'Failed to generate task!'
+     try {
+    const res = await fetch(
+      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
     );
-    showMessage(`📝 Task:\n${task}`, 'bot');
-    hintBtn.disabled = true;
-  };
+    if (!res.ok) {
+      showMessage(`Error ${res.status}: ${await res.text()}`, 'bot');
+      return;
+    }
+    const data = await res.json();
+    currentTaskText = data.task;  // Now a parsed object
+    
+    // Display the task to the user
+    try {
+      const taskName = currentTaskText["Task name"];
+      const description = currentTaskText["Task description"];
+      const sampleInput = currentTaskText["Sample input cases"];
+      const expectedOutput = currentTaskText["Expected outputs for the test cases"];
+      const hints = currentTaskText["Hints"];
+
+      
+      showMessage(
+        `📝 ${taskName}\n${description}\n\n` +
+        `Sample input: ${sampleInput}\n` +
+        `Expected output: ${expectedOutput}`,
+        'bot'
+      );
+    } catch (error) {
+      console.error("❌ Task display error:", error);
+      showMessage("⚠️ Couldn't display task properly. Try again.", "bot");
+    }
+    
+    taskShown = true;
+    hintBtn.disabled = false;
+  } catch (err) {
+    showMessage(`Error: ${err.message}`, 'bot');
+  }
+};
 
   submitCodeBtn.addEventListener('click', async () => {
     if (!syllabusLoaded) return;
@@ -263,13 +325,50 @@ document.addEventListener('DOMContentLoaded', () => {
     hintBtn.disabled = false;
     userInput.value = '';
     userInput.style.height = 'auto';
-    const resp = await fetchText('/submit_code', 'Failed to submit code.', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic: selectedTopic, difficulty: currentDifficulty, code })
-    });
-    showMessage(resp, 'bot');
-  });
+    showMessage('Checking…', 'bot');
+
+    try {
+        const response = await fetch('/evaluate_code', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                task: JSON.stringify(currentTaskText),
+                code: code
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            showMessage(`Error ${response.status}: ${errorText}`, 'bot');
+            return;
+        }
+        
+        const result = await response.json();
+        const evaluation = result.evaluation;
+        
+        // Handle different response types
+        if (evaluation.error) {
+            showMessage(`⚠️ Evaluation error: ${evaluation.error}`, 'bot');
+            if (evaluation.raw) {
+                showMessage(`Raw response: ${evaluation.raw}`, 'bot');
+            }
+        } 
+        else if (evaluation.question) {
+            // It's a question response
+            showMessage(`❓ ${evaluation.feedback}`, 'bot');
+        } 
+        else {
+            // It's a code evaluation
+            if (evaluation.correct) {
+                showMessage(`✅ Correct! ${evaluation.feedback || 'Great job!'}`, 'bot');
+            } else {
+                showMessage(`❌ Not correct: ${evaluation.feedback || 'Try again'}`, 'bot');
+            }
+        }
+    } catch (err) {
+        showMessage(`Network error: ${err.message}`, 'bot');
+    }
+});
 
   hintBtn.addEventListener('click', async () => {
     if (!syllabusLoaded) return;
