@@ -201,64 +201,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
 fileInput.setAttribute('accept', '.txt,application/pdf');
 
-fileInput.addEventListener('change', async e => {
+fileInput.addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) return;
 
-  const name = f.name.toLowerCase();
-  if (!name.endsWith('.txt') && !name.endsWith('.pdf')) {
-    return alert('Only .txt and .pdf files allowed');
-  }
   let text;
+  const name = f.name.toLowerCase();
   if (name.endsWith('.txt')) {
-    text = await new Promise(res => {
-      const r = new FileReader();
-      r.onload = () => res(r.result);
-      r.readAsText(f);
+    text = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result);
+      reader.onerror = () => rej(reader.error);
+      reader.readAsText(f);
     });
-  } else {
-    const buf = await f.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    let full = '';
+  } else if (name.endsWith('.pdf')) {
+    const buffer = await f.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    let fullText = '';
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      full += content.items.map(it => it.str).join(' ') + '\n';
+      fullText += content.items.map(item => item.str).join(' ') + '\n';
     }
-    text = full;
+    text = fullText;
+  } else {
+    return alert('Only .txt and .pdf files allowed');
   }
 
-  const idx = text.search(/Tentative Course Schedule:/i);
-  const scheduleText = idx >= 0 ? text.slice(idx) : text;
-
-  const endIdx = scheduleText.search(/Means of Evaluation:/i);
-  const scheduleBlock = endIdx >= 0
-    ? scheduleText.slice(0, endIdx)
-    : scheduleText;
-
-  const re = /Week\s*\d+\s+(.+?)(?=Week\s*\d+\s+|$)/gis;
+  const lines = text.split(/\r?\n/);
   const topics = [];
-  let m;
-  while ((m = re.exec(scheduleBlock)) !== null) {
-    topics.push(m[1].trim());
+  for (const line of lines) {
+    const match = line.match(/^\s*Week\s*(\d+)\s+(.+)/i);
+    if (match) {
+      topics.push(match[2].trim());
+    }
   }
-
 
   if (topics.length === 0) {
-    console.log('Parsed chunk:', scheduleText);
     return alert('No course topics found in the uploaded file.');
   }
-
-  // 5) Обновляем интерфейс и шлём на сервер
+  
   updateTopicList(topics);
-  fetch('/save_syllabus', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ topics })
-  }).catch(() => {});
+  try {
+    await fetch('/save_syllabus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topics })
+    });
+  } catch (err) {
+    console.warn('Failed to save syllabus:', err);
+  }
+
   alert('Syllabus uploaded ✅');
 });
-
 
 
   if (adminFails >= 3) {
