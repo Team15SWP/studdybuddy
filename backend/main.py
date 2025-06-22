@@ -1,104 +1,155 @@
 import os
 import requests
-from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from dotenv import load_dotenv
+import json, re
 
-from database import (
-    init_db, register_user, update_score, get_inactive_users,
-    save_syllabus, get_syllabus, get_hint
-)
+import os, json, tempfile, subprocess, re
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
 
 load_dotenv()
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="static")
-
-@app.on_event("startup")
-def startup():
-    init_db()
-
-API_URL = 'https://openrouter.ai/api/v1/chat/completions'
+API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 def get_api_key():
-    key = os.getenv('OPENROUTER_API_KEY')
+    key = os.getenv("OPENROUTER_API_KEY")
     if not key:
-        raise RuntimeError("OPENROUTER_API_KEY not set in .env")
+        raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
     return key
 
 def call_openrouter(prompt: str, timeout: int = 30) -> dict:
     headers = {
-        'Authorization': f"Bearer {get_api_key()}",
-        'Content-Type': 'application/json'
+        "Authorization": f"Bearer {get_api_key()}",
+        "Content-Type": "application/json",
     }
     payload = {
-        'model': 'deepseek/deepseek-r1-0528-qwen3-8b:free',
-        'messages': [{'role': 'user', 'content': prompt}]
+        "model": "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        "messages": [{"role": "user", "content": prompt}],
     }
-    response = requests.post(API_URL, json=payload, headers=headers, timeout=timeout)
-    response.raise_for_status()
-    return response.json()
+    resp = requests.post(API_URL, json=payload, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
 
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.post("/register")
-async def register(email: str = Form(...), login: str = Form(...), password: str = Form(...)):
-    print(f"Trying to register user: {email}, {login}")
-    try:
-        register_user(email, login, password)
-        return {"message": "User registered"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.get("/get_syllabus")
-async def get_syllabus_route():
-    return {"topics": get_syllabus()}
-
-@app.post("/save_syllabus")
-async def save_syllabus_route(data: dict):
-    topics = data.get("topics", [])
-    save_syllabus(topics)
-    return {"message": "Syllabus saved"}
-
-@app.get("/get_hint")
-async def get_hint_route(topic: str, difficulty: str):
-    return {"hint": get_hint(topic, difficulty)}
-
-@app.get("/generate_task")
-async def generate_task(topic: str, difficulty: str):
+# 1) Генерация задачи (для script.js -> postJson('/send_message'))
+@app.post("/send_message")
+async def send_message(request: Request):
+    data = await request.json()
+    topic = data.get("topic", "")
+    difficulty = data.get("difficulty", "Easy")
     prompt = (
-        f"Create one Python programming task on '{topic}' with '{difficulty}' difficulty. "
-        "Respond with only the task description. Include a sample input and expected output."
+        f"Create one Python programming task on '{topic}' with '{difficulty}' difficulty.\n"
+        "Respond with a JSON object exactly like:\n"
+        "{\n"
+        "  \"Task name\": string,\n"
+        "  \"Task description\": string,\n"
+        "  \"Sample input cases\": [ {\"input\": \"<in>\", \"expected_output\": \"<out>\"} ]\n"
+        "}\n"
+        "Only output the JSON."
     )
     try:
         result = call_openrouter(prompt)
-        task = result['choices'][0]['message']['content'].strip()
-        return {"task": task}
+        task = result["choices"][0]["message"]["content"].strip()
+        return JSONResponse({"task": task})
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 401:
-            raise HTTPException(status_code=401, detail="Invalid API key")
+            raise HTTPException(401, "Invalid API Key")
         return JSONResponse({"error": str(http_err)}, status_code=500)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-@app.post("/evaluate_code")
-async def evaluate_code(request: Request):
+# в main.py, после @app.post("/send_message") и до @app.post("/submit_code")
+@app.get("/generate_task")
+async def generate_task_alias(topic: str, difficulty: str):
+    prompt = (
+        f"Create one Python programming task on '{topic}' with '{difficulty}' difficulty.\n"
+        "Respond with a JSON object exactly like:\n"
+        "{\n"
+        "  \"Task name\": string,\n"
+        "  \"Task description\": string,\n"
+        "  \"Sample input cases\": [ {\"input\": \"<in>\", \"expected_output\": \"<out>\"} ]\n"
+        "}\n"
+        "Only output the JSON."
+    )
     try:
-        data = await request.json()
-        task_description = data.get("task", "")
-        user_code = data.get("code", "")
-        prompt = (
-            f"Task:\n{task_description}\n\n"
-            f"User solution:\n```python\n{user_code}\n```\n\n"
-            "Analyze the code. Respond with JSON: {'correct': bool, 'feedback': string}"
-        )
         result = call_openrouter(prompt)
-        evaluation = result['choices'][0]['message']['content'].strip()
-        return {"evaluation": evaluation}
+        task = result["choices"][0]["message"]["content"].strip()
+        return JSONResponse({"task": task})
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 401:
+            raise HTTPException(401, "Invalid API Key")
+        return JSONResponse({"error": str(http_err)}, status_code=500)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+
+@app.post("/submit_code")
+async def submit_code_alias(request: Request):
+    # просто прокидываем в ваш evaluate_code
+    return await evaluate_code(request)
+
+
+@app.post("/evaluate_code")
+async def evaluate_code(request: Request):
+    # 1) Считаем «сырое» тело и логируем
+    raw = (await request.body()).decode(errors="replace")
+    print(">>> DEBUG raw request body:", raw)
+
+    try:
+        data = json.loads(raw)
+    except Exception as e:
+        print(">>> DEBUG JSON.parse error:", e)
+        return JSONResponse({
+            "error":   "Bad JSON payload",
+            "details": str(e),
+            "raw":     raw
+        }, status_code=200)
+
+    task_json_str = data.get("task")
+    code          = data.get("code")
+
+    if task_json_str is None or code is None:
+        return JSONResponse({
+            "error":   "Missing field",
+            "expected": ["task", "code"],
+            "received": list(data.keys())
+        }, status_code=200)
+
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)```", task_json_str, re.IGNORECASE)
+    if m:
+        task_json_str = m.group(1).strip()
+
+    try:
+        task = json.loads(task_json_str)
+    except Exception as e:
+        print(">>> DEBUG task JSON error:", e)
+        return JSONResponse({
+            "error":   "Invalid task JSON",
+            "details": str(e),
+            "raw_task": task_json_str
+        }, status_code=200)
+
+    tests = task.get("Sample input cases")
+    if not isinstance(tests, list) or not tests:
+        return JSONResponse({
+            "error": "No sample cases",
+            "raw_task": task_json_str
+        }, status_code=200)
+
+    return JSONResponse({
+        "correct":   False,
+        "feedback":  "Reached end of debug stub — replace with real runner",
+        "num_tests": len(tests)
+    }, status_code=200)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())

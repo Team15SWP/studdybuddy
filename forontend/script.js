@@ -199,23 +199,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
   uploadBtn.addEventListener('click', () => fileInput.click());
 
-  fileInput.addEventListener('change', e => {
+  fileInput.setAttribute('accept', '.txt,application/pdf');
+
+  fileInput.addEventListener('change', async (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    if (!f.name.endsWith('.txt')) return alert('Only .txt files allowed');
-    const reader = new FileReader();
-    reader.onload = () => {
-      const lines = reader.result.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      if (!lines.length) return alert('File is empty');
-      updateTopicList(lines);
-      fetch('/save_syllabus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topics: lines })
-      }).catch(() => {});
-      alert('Syllabus uploaded ✅');
-    };
-    reader.readAsText(f);
+
+    let text;
+    const name = f.name.toLowerCase();
+    if (name.endsWith('.txt')) {
+      text = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = () => res(reader.result);
+        reader.onerror = () => rej(reader.error);
+        reader.readAsText(f);
+      });
+    } else if (name.endsWith('.pdf')) {
+      const buffer = await f.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map(item => item.str).join(' ') + '\n';
+      }
+      text = fullText;
+    } else {
+      return alert('Only .txt and .pdf files allowed');
+    }
+
+    const lines = text.split(/\r?\n/);
+    const topics = [];
+    for (const line of lines) {
+      const match = line.match(/^\s*Week\s*(\d+)\s+(.+)/i);
+      if (match) {
+        topics.push(match[2].trim());
+      }
+    }
+
+    if (topics.length === 0) {
+      return alert('No course topics found in the uploaded file.');
+    }
+
+try {
+  const res = await fetch('/save_syllabus', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topics })
+  });
+
+  if (!res.ok) {
+    alert('❌ Failed to save syllabus on server.');
+    return;
+  }
+
+  const refreshed = await fetch('/get_syllabus');
+  if (refreshed.ok) {
+    const data = await refreshed.json();
+    updateTopicList(data.topics);
+    alert('Syllabus uploaded and reloaded ✅');
+  } else {
+    alert('✅ Uploaded, but failed to reload topics');
+  }
+} catch (err) {
+  console.warn('Failed to save syllabus:', err);
+  alert('❌ Error during syllabus upload');
+}
+
+
   });
 
   if (adminFails >= 3) {
@@ -239,16 +290,41 @@ document.addEventListener('DOMContentLoaded', () => {
   window.chooseDifficulty = async level => {
     if (!syllabusLoaded) return;
     hideQuote();
-    if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
+    if (!selectedTopic) {
+      return showMessage('❗️ Please select topic first', 'bot');
+    }
     currentDifficulty = level;
     const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
     showMessage(labels[level], 'user');
     showMessage('Generating task…', 'bot');
-    const task = await fetchText(
-      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`,
-      'Failed to generate task!'
-    );
-    showMessage(`📝 Task:\n${task}`, 'bot');
+
+    try {
+      const res = await fetch(
+        `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
+      );
+      const json = await res.json();
+
+      let taskObj;
+      try {
+        taskObj = JSON.parse(json.task);
+      } catch (parseErr) {
+        console.error('Failed to parse task JSON:', json.task, parseErr);
+        showMessage(json.task, 'bot');
+        return;
+      }
+
+      let out = `📝 *${taskObj["Task name"]}*\n\n`;
+      out += `${taskObj["Task description"]}\n\n`;
+      out += `🧪 Sample cases:\n`;
+      taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
+        out += `• Input: ${input} → Expected: ${expected_output}\n`;
+      });
+
+      showMessage(out, 'bot');
+    } catch (err) {
+      showMessage(`Error: ${err.message}`, 'bot');
+    }
+
     hintBtn.disabled = true;
   };
 
@@ -299,3 +375,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
   adjustLayoutHeight();
 });
+
+
