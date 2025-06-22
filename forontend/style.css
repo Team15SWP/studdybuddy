@@ -369,3 +369,48 @@ button {
 .upload-btn:hover { background: #4ade80; transform: scale(1.05); }
 
 .hidden { display: none !important; }
+.subtab-selector { display:flex; gap:14px; justify-content:center; }
+.subtab {
+  background:#252536; border:none; padding:6px 26px; border-radius:8px;
+  color:#fff; cursor:pointer; transition:background .2s;
+}
+.subtab.active { background:#4f46e5; }
+.link {
+  color: #4f46e5;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: transform 0.2s, color 0.2s;
+}
+.link:hover {
+  transform: scale(1.05);
+  color: #6366f1;
+}
+.link:active {
+  transform: scale(0.98);
+}
+
+.login-form input {
+  margin-bottom: 8px;
+}
+
+.switch-text {
+  font-size: 14px;
+  margin-top: 4px;
+  text-align: center;
+}
+
+.login-submit {
+  background: #4f46e5;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s, transform 0.2s;
+}
+.login-submit:hover {
+  background: #6366f1;
+  transform: scale(1.05);
+}
+.login-submit:active {
+  transform: scale(0.98);
+}
