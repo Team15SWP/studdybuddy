@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isAdmin = false;
   let syllabusLoaded = false;
   let adminFails = parseInt(localStorage.getItem('adminFailedAttempts') || '0', 10);
+  let diffPromptMsg = null;            // <-- ссылка на «Select difficulty 👇»
 
   profileDiv.style.display = 'none';
   logoutBtn.style.display = 'none';
@@ -49,12 +50,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const hideQuote = () => quoteBlock && (quoteBlock.style.display = 'none');
 
   const showMessage = (t, s = 'bot') => {
-    const d = document.createElement('div');
-    d.className = `message ${s}`;
-    d.textContent = t;
-    messagesBox.appendChild(d);
-    messagesBox.scrollTop = messagesBox.scrollHeight;
-  };
+  const d = document.createElement('div');
+  d.className = `message ${s}`;
+  d.textContent = t;
+  messagesBox.appendChild(d);
+  messagesBox.scrollTop = messagesBox.scrollHeight;
+  return d;                    //  ⬅️  new: give caller a handle
+};
+
+  const makeWaitingNotice = txt => {
+  const node = showMessage(txt, 'bot'); // same styling as other bot msgs
+  return () => node.remove();           // call this when work is done
+};
 
   const showCodeMessage = c => {
     const d = document.createElement('div');
@@ -65,17 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
     messagesBox.appendChild(d);
     messagesBox.scrollTop = messagesBox.scrollHeight;
   };
-
-  // const fetchText = async (u, fb, o = {}) => {
-  //   try {
-  //     const r = await fetch(u, o);
-  //     if (!r.ok) return `Error ${r.status}: ${await r.text()}`;
-  //     const ct = r.headers.get('content-type') || '';
-  //     return ct.includes('application/json') ? (await r.json()).message || 'OK' : await r.text();
-  //   } catch (e) {
-  //     return `Network error: ${e.message}`;
-  //   }
-  // };
 
   const fetchEval = async (url, opts = {}) => {
   const r = await fetch(url, opts);
@@ -125,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedTopic = li.textContent.trim().toLowerCase().replace(/\s+/g, '_');
     hintBtn.disabled = true;
     showMessage(li.textContent, 'user');
-    showMessage('Select difficulty 👇', 'bot');
+    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
     diffBox.style.display = 'flex';
   };
 
@@ -301,9 +297,18 @@ fileInput.addEventListener('change', async e => {
     return showMessage('❗️ Please select topic first', 'bot');
   }
   currentDifficulty = level;
+  // delete level of difficulty
+  if (diffPromptMsg) {
+  diffPromptMsg.remove();
+  diffPromptMsg = null;
+}
+// diffBox.style.display = 'none';
+
   const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
   showMessage(labels[level], 'user');
-  showMessage('Generating task…', 'bot');
+  // showMessage('Generating task…', 'bot');
+  const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
+
 
   try {
     // 1) Делаем fetch напрямую
@@ -333,8 +338,9 @@ fileInput.addEventListener('change', async e => {
     showMessage(out, 'bot');
   } catch (err) {
     showMessage(`Error: ${err.message}`, 'bot');
+  } finally {
+    stopNotice();              // ✅ always clean up
   }
-
   hintBtn.disabled = true;
 };
 
@@ -353,6 +359,9 @@ fileInput.addEventListener('change', async e => {
   showCodeMessage(code);        // показываем отправленный код
   hintBtn.disabled = false;
 
+  const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
+
+
   userInput.value = '';
   userInput.style.height = 'auto';
 
@@ -370,7 +379,9 @@ fileInput.addEventListener('change', async e => {
 
     showMessage(respText, 'bot');        // выводим аккуратный фидбек
   } catch (e) {
-    showMessage(`Error: ${e.message}`, 'bot');   // ошибка сервера/сети
+    showMessage(`Error: ${e.message}`, 'bot');
+  } finally {
+    stopNotice();              // ✅ remove notice whatever happens
   }
 });
 
