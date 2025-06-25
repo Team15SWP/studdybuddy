@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let selectedTopic = null;
   let currentDifficulty = null;
+  let currentTaskRaw    = "";
   let isAdmin = false;
   let syllabusLoaded = false;
   let adminFails = parseInt(localStorage.getItem('adminFailedAttempts') || '0', 10);
@@ -65,16 +66,31 @@ document.addEventListener('DOMContentLoaded', () => {
     messagesBox.scrollTop = messagesBox.scrollHeight;
   };
 
-  const fetchText = async (u, fb, o = {}) => {
-    try {
-      const r = await fetch(u, o);
-      if (!r.ok) return `Error ${r.status}: ${await r.text()}`;
-      const ct = r.headers.get('content-type') || '';
-      return ct.includes('application/json') ? (await r.json()).message || 'OK' : await r.text();
-    } catch (e) {
-      return `Network error: ${e.message}`;
-    }
-  };
+  // const fetchText = async (u, fb, o = {}) => {
+  //   try {
+  //     const r = await fetch(u, o);
+  //     if (!r.ok) return `Error ${r.status}: ${await r.text()}`;
+  //     const ct = r.headers.get('content-type') || '';
+  //     return ct.includes('application/json') ? (await r.json()).message || 'OK' : await r.text();
+  //   } catch (e) {
+  //     return `Network error: ${e.message}`;
+  //   }
+  // };
+
+  const fetchEval = async (url, opts = {}) => {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error(await r.text());
+
+  const data = await r.json();   // { correct, feedback } или { message }
+
+  // Если есть message → сразу отдаём
+  if ('message' in data) return data.message;
+
+  // Иначе собираем текст из correct / feedback
+  return `${data.correct ? '✅ Correct solution!' : '❌ Wrong solution.'}`
+       + (data.feedback ? `\n\n${data.feedback}` : '');
+};
+
 
   const updateTopicList = arr => {
     syllabusLoaded = arr.length > 0;
@@ -199,75 +215,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
   uploadBtn.addEventListener('click', () => fileInput.click());
 
-  fileInput.setAttribute('accept', '.txt,application/pdf');
+fileInput.setAttribute('accept', '.txt,application/pdf');
 
-  fileInput.addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
+fileInput.addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
 
-    let text;
-    const name = f.name.toLowerCase();
-    if (name.endsWith('.txt')) {
-      text = await new Promise((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result);
-        reader.onerror = () => rej(reader.error);
-        reader.readAsText(f);
-      });
-    } else if (name.endsWith('.pdf')) {
-      const buffer = await f.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        fullText += content.items.map(item => item.str).join(' ') + '\n';
-      }
-      text = fullText;
-    } else {
-      return alert('Only .txt and .pdf files allowed');
+  const name = f.name.toLowerCase();
+  if (!name.endsWith('.txt') && !name.endsWith('.pdf')) {
+    return alert('Only .txt and .pdf files allowed');
+  }
+  let text;
+  if (name.endsWith('.txt')) {
+    text = await new Promise(res => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.readAsText(f);
+    });
+  } else {
+    const buf = await f.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let full = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      full += content.items.map(it => it.str).join(' ') + '\n';
     }
+    text = full;
+  }
 
-    const lines = text.split(/\r?\n/);
-    const topics = [];
-    for (const line of lines) {
-      const match = line.match(/^\s*Week\s*(\d+)\s+(.+)/i);
-      if (match) {
-        topics.push(match[2].trim());
-      }
-    }
+  const idx = text.search(/Tentative Course Schedule:/i);
+  const scheduleText = idx >= 0 ? text.slice(idx) : text;
 
-    if (topics.length === 0) {
-      return alert('No course topics found in the uploaded file.');
-    }
+  const endIdx = scheduleText.search(/Means of Evaluation:/i);
+  const scheduleBlock = endIdx >= 0
+    ? scheduleText.slice(0, endIdx)
+    : scheduleText;
 
-try {
-  const res = await fetch('/save_syllabus', {
+  const re = /Week\s*\d+\s+(.+?)(?=Week\s*\d+\s+|$)/gis;
+  const topics = [];
+  let m;
+  while ((m = re.exec(scheduleBlock)) !== null) {
+    topics.push(m[1].trim());
+  }
+
+
+  if (topics.length === 0) {
+    console.log('Parsed chunk:', scheduleText);
+    return alert('No course topics found in the uploaded file.');
+  }
+
+  // 5) Обновляем интерфейс и шлём на сервер
+  updateTopicList(topics);
+  fetch('/save_syllabus', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ topics })
-  });
+  }).catch(() => {});
+  alert('Syllabus uploaded ✅');
+});
 
-  if (!res.ok) {
-    alert('❌ Failed to save syllabus on server.');
-    return;
-  }
-
-  const refreshed = await fetch('/get_syllabus');
-  if (refreshed.ok) {
-    const data = await refreshed.json();
-    updateTopicList(data.topics);
-    alert('Syllabus uploaded and reloaded ✅');
-  } else {
-    alert('✅ Uploaded, but failed to reload topics');
-  }
-} catch (err) {
-  console.warn('Failed to save syllabus:', err);
-  alert('❌ Error during syllabus upload');
-}
-
-
-  });
 
   if (adminFails >= 3) {
     adminAttemptsInfo.textContent = 'UI locked after 3 failed attempts.';
@@ -288,64 +295,85 @@ try {
   });
 
   window.chooseDifficulty = async level => {
-    if (!syllabusLoaded) return;
-    hideQuote();
-    if (!selectedTopic) {
-      return showMessage('❗️ Please select topic first', 'bot');
-    }
-    currentDifficulty = level;
-    const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
-    showMessage(labels[level], 'user');
-    showMessage('Generating task…', 'bot');
+  if (!syllabusLoaded) return;
+  hideQuote();
+  if (!selectedTopic) {
+    return showMessage('❗️ Please select topic first', 'bot');
+  }
+  currentDifficulty = level;
+  const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
+  showMessage(labels[level], 'user');
+  showMessage('Generating task…', 'bot');
 
-    try {
-      const res = await fetch(
-        `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
-      );
-      const json = await res.json();
+  try {
+    // 1) Делаем fetch напрямую
+    const res = await fetch(
+      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
+    );
+    const json = await res.json();
+    currentTaskRaw = json.task;
 
-      let taskObj;
-      try {
-        taskObj = JSON.parse(json.task);
-      } catch (parseErr) {
-        console.error('Failed to parse task JSON:', json.task, parseErr);
-        showMessage(json.task, 'bot');
-        return;
-      }
-
-      let out = `📝 *${taskObj["Task name"]}*\n\n`;
-      out += `${taskObj["Task description"]}\n\n`;
-      out += `🧪 Sample cases:\n`;
-      taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
-        out += `• Input: ${input} → Expected: ${expected_output}\n`;
-      });
-
-      showMessage(out, 'bot');
-    } catch (err) {
-      showMessage(`Error: ${err.message}`, 'bot');
+    if (!res.ok) {
+      // если сервер вернул ошибку
+      throw new Error(json.error || res.statusText);
     }
 
-    hintBtn.disabled = true;
-  };
+    // 2) Парсим строку в объект
+    const taskObj = JSON.parse(json.task);
+
+    // 3) Собираем отформатированное сообщение (без Hints)
+    let out = `📝 *${taskObj["Task name"]}*\n\n`;
+    out += `${taskObj["Task description"]}\n\n`;
+    out += `🧪 Sample cases:\n`;
+    taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
+      out += `• Input: ${input} → Expected: ${expected_output}\n`;
+    });
+
+    // 4) Выводим в чат
+    showMessage(out, 'bot');
+  } catch (err) {
+    showMessage(`Error: ${err.message}`, 'bot');
+  }
+
+  hintBtn.disabled = true;
+};
+
 
   submitCodeBtn.addEventListener('click', async () => {
-    if (!syllabusLoaded) return;
-    if (!selectedTopic) return showMessage('❗️ Please select topic before sending code', 'bot');
-    if (!currentDifficulty) return showMessage('❗️ Please select difficulty before sending code', 'bot');
-    const code = userInput.value.trim();
-    if (!code) return;
-    hideQuote();
-    showCodeMessage(code);
-    hintBtn.disabled = false;
-    userInput.value = '';
-    userInput.style.height = 'auto';
-    const resp = await fetchText('/submit_code', 'Failed to submit code.', {
+  if (!syllabusLoaded) return;
+  if (!selectedTopic)
+    return showMessage('❗️ Please select topic before sending code', 'bot');
+  if (!currentDifficulty)
+    return showMessage('❗️ Please select difficulty before sending code', 'bot');
+
+  const code = userInput.value.trim();
+  if (!code) return;
+
+  hideQuote();
+  showCodeMessage(code);        // показываем отправленный код
+  hintBtn.disabled = false;
+
+  userInput.value = '';
+  userInput.style.height = 'auto';
+
+  try {
+    const respText = await fetchEval('/submit_code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic: selectedTopic, difficulty: currentDifficulty, code })
+      body: JSON.stringify({
+        topic: selectedTopic,
+        difficulty: currentDifficulty,
+        task:   currentTaskRaw,
+        code
+      })
     });
-    showMessage(resp, 'bot');
-  });
+
+    showMessage(respText, 'bot');        // выводим аккуратный фидбек
+  } catch (e) {
+    showMessage(`Error: ${e.message}`, 'bot');   // ошибка сервера/сети
+  }
+});
+
 
   hintBtn.addEventListener('click', async () => {
     if (!syllabusLoaded) return;
@@ -375,5 +403,3 @@ try {
 
   adjustLayoutHeight();
 });
-
-
