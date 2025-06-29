@@ -1,1 +1,2 @@
 .env\n__pycache__/\nvenv/\n*.pyc
+.env
