@@ -293,3 +293,4 @@ if __name__ == "__main__":
 
     uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=False)
 # Тестовый коммит для деплоя с новым ключом
+# New API key
