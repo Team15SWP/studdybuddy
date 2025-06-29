@@ -1,0 +1,64 @@
+name: CI/CD Pipeline
+
+# Триггеры: запуск при пушe или PR в main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Проверка кода из репозитория
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Запуск тестов (настройте под ваш проект)
+      - name: Run tests
+        run: |
+          # Пример: если у вас есть тесты, замените на свою команду
+          python -m unittest discover  # или pytest, если используете
+
+      - name: Build Docker image
+        run: |
+          docker-compose build
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'  # Деплой только при пушe в main
+
+    steps:
+      # Проверка кода
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Настройка SSH для деплоя на сервер
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}  # IP сервера
+          username: ${{ secrets.SERVER_USER }}  # Например, root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}  # SSH-ключ
+          script: |
+            cd /var/www/studdybuddy
+            git pull origin main
+            docker-compose down
+            docker-compose up -d
