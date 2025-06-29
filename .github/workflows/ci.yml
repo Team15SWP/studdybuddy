@@ -52,7 +52,7 @@ jobs:
         run: sleep 10
 
       - name: Run unit tests
-        run: pytest tests/unit/ --maxfail=1 -q
+        run: pytest tests/unit_tests/ --maxfail=1 -q
 
       - name: Run integration tests
         run: pytest tests/integration/ --maxfail=1 -q
