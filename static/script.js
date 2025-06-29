@@ -290,28 +290,23 @@ fileInput.addEventListener('change', async e => {
     }
   });
 
-  window.chooseDifficulty = async level => {
+window.chooseDifficulty = async level => {
   if (!syllabusLoaded) return;
   hideQuote();
   if (!selectedTopic) {
     return showMessage('❗️ Please select topic first', 'bot');
   }
   currentDifficulty = level;
-  // delete level of difficulty
+  console.log(`Sending request with topic: ${selectedTopic}, difficulty: ${level}`); // Отладка
   if (diffPromptMsg) {
-  diffPromptMsg.remove();
-  diffPromptMsg = null;
-}
-// diffBox.style.display = 'none';
-
+    diffPromptMsg.remove();
+    diffPromptMsg = null;
+  }
   const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
   showMessage(labels[level], 'user');
-  // showMessage('Generating task…', 'bot');
   const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
 
-
   try {
-    // 1) Делаем fetch напрямую
     const res = await fetch(
       `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
     );
@@ -319,14 +314,10 @@ fileInput.addEventListener('change', async e => {
     currentTaskRaw = json.task;
 
     if (!res.ok) {
-      // если сервер вернул ошибку
       throw new Error(json.error || res.statusText);
     }
 
-    // 2) Парсим строку в объект
     const taskObj = JSON.parse(json.task);
-
-    // 3) Собираем отформатированное сообщение (без Hints)
     let out = `📝 *${taskObj["Task name"]}*\n\n`;
     out += `${taskObj["Task description"]}\n\n`;
     out += `🧪 Sample cases:\n`;
@@ -334,12 +325,11 @@ fileInput.addEventListener('change', async e => {
       out += `• Input: ${input} → Expected: ${expected_output}\n`;
     });
 
-    // 4) Выводим в чат
     showMessage(out, 'bot');
   } catch (err) {
     showMessage(`Error: ${err.message}`, 'bot');
   } finally {
-    stopNotice();              // ✅ always clean up
+    stopNotice();
   }
   hintBtn.disabled = true;
 };
