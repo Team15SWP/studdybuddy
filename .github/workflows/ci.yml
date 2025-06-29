@@ -25,10 +25,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Run tests
+          
+      - name: Install test runner
+        run: pip install pytest
+        
+      - name: Run unit & integration tests
         run: |
-          python -m unittest discover  # Замените на свою команду тестов
+          pytest tests/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
