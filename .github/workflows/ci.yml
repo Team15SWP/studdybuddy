@@ -60,5 +60,6 @@ jobs:
           script: |
             cd /var/www/studdybuddy
             git pull origin main
+            echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" > .env
             docker-compose down
             docker-compose up -d
