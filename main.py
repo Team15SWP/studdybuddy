@@ -180,13 +180,23 @@ async def generate_task(topic: str, difficulty: str):
         f"Create one Python programming task on '{topic}' with '{difficulty}' difficulty.\n"
         "Respond ONLY with valid JSON (no markdown, no explanations).\n"
         "Do NOT use Python tuples like ('a', 1). Use JSON arrays like [\"a\", 1].\n"
-        "**Use double quotes for all strings (not single quotes).**\n"
+        "Use double quotes for all strings (not single quotes).\n"
         "The structure must be:\n"
         "{\n"
         "  \"Task name\": string,\n"
         "  \"Task description\": string,\n"
-        "  \"Sample input cases\": [ {\"input\": \"<in>\", \"expected_output\": \"<out>\"} ]\n"
-        "}"
+        "  \"Sample input cases\": [ {\"input\": \"<in>\", \"expected_output\": \"<out>\"} ],\n"
+        "  \"Hints\": {\n"
+        "    \"Hint1\": \"general concept\",\n"
+        "    \"Hint2\": \"solution logic\",\n"
+        "    \"Hint3\": \"partial solution or specific guidance\"\n"
+        "  }\n"
+        "}\n"
+        "Each subsequent hint must be more specific than the previous one (e.g., concept -> logic -> partial guidance).\n"
+        "The first hint MUST be about general concept, the second hint MUST be about solution logic, the third hint MUST\n"
+        "be about partial guidance to solution.\n"
+        "All hint keys MUST be present and use exact casing: \"Hint1\", \"Hint2\", \"Hint3\".\n"
+        "Each hint MUST be meaningful. Do NOT leave any hint blank or undefined."
     )
 
     last_error: Exception | None = None
@@ -239,11 +249,14 @@ async def evaluate_code(request: Request):
     code: str = data.get("code", "")
 
     eval_prompt = (
-        f"Task:\n{task}\n\n"
-        f"User solution:\n```python\n{code}\n```\n\n"
-        "Respond **only** with a JSON object "
-        "(fields: correct: true/false, feedback: string)."
-    )
+            f"Task:\n{task}\n\n"
+            f"User message:\n {code}\n"
+            "Check if the user message is a code solution or question regarding task\n"
+            "If the message is a question - respond with a JSON object with fields: 'question': true, 'feedback': answer for the question. Do not give away solution, only help with understanding task requirements"
+            "If the message is a code solution - Analyze the above code for correctness against the task requirements. "
+            "Respond with a JSON object with fields: 'question': false 'correct': true or false, 'feedback': a brief explanation (only if correct is false, if true - make a compliment). Do not include additional comments or formatting"
+        ) 
+
 
     llm_raw: str = ""
     for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -292,3 +305,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=False)
+
