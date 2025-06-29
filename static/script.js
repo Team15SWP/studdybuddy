@@ -34,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let syllabusLoaded = false;
   let adminFails = parseInt(localStorage.getItem('adminFailedAttempts') || '0', 10);
   let diffPromptMsg = null;            // <-- ссылка на «Select difficulty 👇»
+  let currentHints = [];
+  let hintCount = 0;
 
   profileDiv.style.display = 'none';
   logoutBtn.style.display = 'none';
@@ -113,6 +115,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  //Function to clear chat messages
+  function clearChat() {
+    messagesBox.innerHTML = '';
+    taskShown = false;
+    answerSent = false;
+    hintBtn.disabled = true;
+    if (quoteBlock) quoteBlock.style.display = 'none';
+  }
+
   const handleTopic = li => {
     if (!syllabusLoaded) return;
     hideQuote();
@@ -120,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     li.classList.add('active-topic');
     selectedTopic = li.textContent.trim().toLowerCase().replace(/\s+/g, '_');
     hintBtn.disabled = true;
+    clearChat();
     showMessage(li.textContent, 'user');
     diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
     diffBox.style.display = 'flex';
@@ -289,44 +301,49 @@ fileInput.addEventListener('change', async e => {
       submitCodeBtn.click();
     }
   });
-
-  window.chooseDifficulty = async level => {
+  
+window.chooseDifficulty = async level => {
   if (!syllabusLoaded) return;
   hideQuote();
   if (!selectedTopic) {
     return showMessage('❗️ Please select topic first', 'bot');
   }
   currentDifficulty = level;
-  // delete level of difficulty
   if (diffPromptMsg) {
-  diffPromptMsg.remove();
-  diffPromptMsg = null;
-}
-// diffBox.style.display = 'none';
+    diffPromptMsg.remove();
+    diffPromptMsg = null;
+  }
 
   const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
   showMessage(labels[level], 'user');
-  // showMessage('Generating task…', 'bot');
   const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
 
-
   try {
-    // 1) Делаем fetch напрямую
     const res = await fetch(
       `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
     );
     const json = await res.json();
+    console.log("Raw JSON response from backend:", json); 
     currentTaskRaw = json.task;
 
     if (!res.ok) {
-      // если сервер вернул ошибку
       throw new Error(json.error || res.statusText);
     }
 
-    // 2) Парсим строку в объект
     const taskObj = JSON.parse(json.task);
+    
+    // Proper hint parsing
+    if (taskObj.Hints && typeof taskObj.Hints === 'object') {
+      currentHints = [
+        taskObj.Hints.Hint1 || '',
+        taskObj.Hints.Hint2 || '',
+        taskObj.Hints.Hint3 || ''
+      ].filter(hint => hint.trim() !== '');
+    } else {
+      currentHints = [];
+    }
 
-    // 3) Собираем отформатированное сообщение (без Hints)
+    hintCount = 0;
     let out = `📝 *${taskObj["Task name"]}*\n\n`;
     out += `${taskObj["Task description"]}\n\n`;
     out += `🧪 Sample cases:\n`;
@@ -334,18 +351,18 @@ fileInput.addEventListener('change', async e => {
       out += `• Input: ${input} → Expected: ${expected_output}\n`;
     });
 
-    // 4) Выводим в чат
     showMessage(out, 'bot');
+    console.log('Parsed hints:', currentHints);
   } catch (err) {
     showMessage(`Error: ${err.message}`, 'bot');
   } finally {
-    stopNotice();              // ✅ always clean up
+    stopNotice();
   }
   hintBtn.disabled = true;
 };
 
 
-  submitCodeBtn.addEventListener('click', async () => {
+ submitCodeBtn.addEventListener('click', async () => {
   if (!syllabusLoaded) return;
   if (!selectedTopic)
     return showMessage('❗️ Please select topic before sending code', 'bot');
@@ -386,17 +403,19 @@ fileInput.addEventListener('change', async e => {
 });
 
 
-  hintBtn.addEventListener('click', async () => {
-    if (!syllabusLoaded) return;
-    if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
-    if (!currentDifficulty) return showMessage('❗️ Please select difficulty first', 'bot');
-    showMessage('💡 Hint please! 🥺', 'user');
-    const hint = await fetchText(
-      `/get_hint?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(currentDifficulty)}`,
-      'Hint is unavailable!'
-    );
-    showMessage(`💡 Hint: ${hint}`, 'bot');
-  });
+  hintBtn.addEventListener('click', () => {
+  if (!syllabusLoaded) return;
+  if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
+  if (!currentDifficulty) return showMessage('❗️ Please select difficulty first', 'bot');
+  if (!currentHints.length) return showMessage('❗️ No hints available for this task.', 'bot');
+  if (hintCount >= 3) {
+    showMessage("You’ve used all your hints for this submission. Try improving your code or ask for feedback.", 'bot');
+    return;
+  }
+  showMessage('💡 Hint please! 🥺', 'user');
+  showMessage(`💡 Hint: ${currentHints[hintCount]}`, 'bot');
+  hintCount++;
+});
 
   const showHintTip = m => {
     const o = hintWrapper.querySelector('.hint-tooltip');
@@ -414,3 +433,4 @@ fileInput.addEventListener('change', async e => {
 
   adjustLayoutHeight();
 });
+
