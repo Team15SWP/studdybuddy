@@ -301,7 +301,7 @@ fileInput.addEventListener('change', async e => {
       submitCodeBtn.click();
     }
   });
-  
+
 window.chooseDifficulty = async level => {
   if (!syllabusLoaded) return;
   hideQuote();
@@ -309,6 +309,7 @@ window.chooseDifficulty = async level => {
     return showMessage('❗️ Please select topic first', 'bot');
   }
   currentDifficulty = level;
+
   if (diffPromptMsg) {
     diffPromptMsg.remove();
     diffPromptMsg = null;
@@ -344,6 +345,7 @@ window.chooseDifficulty = async level => {
     }
 
     hintCount = 0;
+
     let out = `📝 *${taskObj["Task name"]}*\n\n`;
     out += `${taskObj["Task description"]}\n\n`;
     out += `🧪 Sample cases:\n`;
