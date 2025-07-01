@@ -85,7 +85,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /var/www/studdybuddy
+            git reset --hard HEAD
+            git clean -fd
             git pull origin main
             echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" > .env
             docker-compose down
-            docker-compose up -d
+            docker-compose up -d --build
