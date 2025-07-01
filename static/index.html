@@ -1,27 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Prosto+One&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Prosto+One&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
 </head>
-<body>
-<div class="top-bar">
-  <div class="logo">🐍 Python Practice</div>
 
+<body>
+<section id="homepage" class="homepage">
+  <div class="particle-container">
+    <div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div>
+  </div>
+  <div class="home-content">
+    <h1 class="home-title">Python Practice</h1>
+    <p class="home-tagline">Real-time coding &amp; feedback</p>
+    <button id="start-chat-btn" class="home-btn">Let’s Code!</button>
+
+    <div class="home-features">
+      <div class="feature-item"><div class="feature-icon">📝</div><div class="feature-label">Live Tasks</div></div>
+      <div class="feature-item"><div class="feature-icon">💡</div><div class="feature-label">Smart Hints</div></div>
+      <div class="feature-item"><div class="feature-icon">📊</div><div class="feature-label">Progress Stats</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="top-bar hidden">
+  <div class="logo">🐍 Python Practice</div>
   <div class="right-controls">
     <div id="profile" class="profile">
       <div id="user-avatar" class="user-avatar">👤</div>
       <div id="user-name" class="user-name"></div>
       <button id="logout-btn" class="logout">Log out</button>
     </div>
-
-    <button id="login-btn" class="login-btn">Sign up</button>
+    <button id="login-btn" class="login-btn">Log in</button>
   </div>
 </div>
 
@@ -29,24 +46,17 @@
   You are logged in as an administrator
 </div>
 
-<div class="layout">
+<div class="layout hidden">
   <div class="sidebar">
     <h3>📘 Course Topics</h3>
-
-    <button id="upload-syllabus-btn" class="upload-btn" style="display: none">
-      Upload syllabus
-    </button>
-    <input type="file" id="syllabus-file" accept=".txt" style="display: none" />
-
-    <ul id="topics-list">
-
-    </ul>
+    <button id="upload-syllabus-btn" class="upload-btn" style="display:none">Upload syllabus</button>
+    <input type="file" id="syllabus-file" accept=".txt" style="display:none" />
+    <ul id="topics-list"></ul>
   </div>
 
   <div class="chat-area">
     <div class="quote">💡 “Code is poetry in logic”</div>
     <div class="messages" id="messages"></div>
-
     <div class="input-box">
       <textarea id="user-input" placeholder="Let's code!"></textarea>
       <button id="submit-code-btn">Send code</button>
@@ -60,7 +70,6 @@
       <button onclick="chooseDifficulty('medium')">🟡 Medium</button>
       <button onclick="chooseDifficulty('hard')">🔴 Hard</button>
     </div>
-
     <div class="hint-wrapper">
       <button id="hint-btn" class="hint-btn" disabled>💡 Hint</button>
       <span id="hint-help" class="hint-help">?</span>
@@ -73,15 +82,26 @@
     <span id="modal-close" class="modal-close">&times;</span>
 
     <div class="tab-selector">
-      <button id="user-tab" class="tab active">User</button>
+      <button id="user-tab"  class="tab active">User</button>
       <button id="admin-tab" class="tab">Admin</button>
     </div>
 
-    <form id="user-form" class="login-form">
-      <input type="text" id="user-name-input" placeholder="Name / Nickname" required />
-      <input type="email" id="user-email-input" placeholder="Email" required />
-      <input type="password" id="user-password-input" placeholder="Password" required />
-      <button type="submit" class="login-submit">Login</button>
+    <form id="login-form" class="login-form">
+      <input type="text"     id="li-identifier" placeholder="Email or Nickname" required />
+      <input type="password" id="li-password"   placeholder="Password"        required />
+      <button type="submit"  class="login-submit">Log in</button>
+      <div id="login-error"  class="attempts-info"></div>
+      <p class="switch-text">Don't have an account?
+        <span id="go-signup" class="link">Sign up!</span></p>
+    </form>
+
+    <form id="signup-form" class="login-form hidden">
+      <input type="text"     id="su-name"     placeholder="Name / Nickname" required />
+      <input type="email"    id="su-email"    placeholder="Email"           required />
+      <input type="password" id="su-password" placeholder="Password"        required />
+      <button type="submit"  class="login-submit">Create account</button>
+      <p class="switch-text">Already have an account?
+        <span id="go-login" class="link">Log in!</span></p>
     </form>
 
     <form id="admin-form" class="login-form hidden">
@@ -91,11 +111,10 @@
     </form>
   </div>
 </div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-  </script>
-  <script src="/script.js" defer></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
+<script src="/script.js" defer></script>
 </body>
 </html>
