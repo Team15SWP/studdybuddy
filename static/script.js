@@ -1,4 +1,32 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const homepage     = document.getElementById('homepage');
+  const startChatBtn = document.getElementById('start-chat-btn');
+  const topBar       = document.querySelector('.top-bar');
+  const layoutBox    = document.querySelector('.layout');
+  const adminBanner  = document.getElementById('admin-banner');
+
+  topBar.classList.add('hidden');
+  layoutBox.classList.add('hidden');
+  adminBanner.classList.add('hidden');
+
+  const showChatUi = () => {
+    homepage.classList.add('animate-out');
+    homepage.addEventListener('animationend', () => {
+      homepage.classList.add('hidden');
+      homepage.classList.remove('animate-out');
+      topBar.classList.remove('hidden');
+      topBar.classList.add('animate-in');
+      layoutBox.classList.remove('hidden');
+      layoutBox.classList.add('animate-in');
+      if (!adminBanner.classList.contains('hidden'))
+        adminBanner.classList.add('animate-in');
+      [topBar, layoutBox, adminBanner].forEach(el =>
+        el.addEventListener('animationend', () => el.classList.remove('animate-in'), { once: true })
+      );
+    }, { once: true });
+  };
+  if (startChatBtn) startChatBtn.addEventListener('click', showChatUi);
+
   const messagesBox = document.getElementById('messages');
   const diffBox = document.getElementById('difficulty-buttons');
   const quoteBlock = document.querySelector('.quote');
@@ -8,42 +36,49 @@ document.addEventListener('DOMContentLoaded', () => {
   const hintHelp = document.getElementById('hint-help');
   const hintWrapper = document.querySelector('.hint-wrapper');
   const topicsList = document.getElementById('topics-list');
-  const layoutBox = document.querySelector('.layout');
 
-  const loginBtn = document.getElementById('login-btn');
+  const loginBtn   = document.getElementById('login-btn');
   const loginModal = document.getElementById('login-modal');
   const modalClose = document.getElementById('modal-close');
-  const userTab = document.getElementById('user-tab');
-  const adminTab = document.getElementById('admin-tab');
-  const userForm = document.getElementById('user-form');
-  const adminForm = document.getElementById('admin-form');
+  const userTab    = document.getElementById('user-tab');
+  const adminTab   = document.getElementById('admin-tab');
+
+  const loginForm  = document.getElementById('login-form');   // Email + password
+  const signupForm = document.getElementById('signup-form');  // Name + email + password
+  const goSignup   = document.getElementById('go-signup');    // «Sign up!» link
+  const goLogin    = document.getElementById('go-login');     // «Log in!» link
+  const loginError = document.getElementById('login-error');  // div для ошибок
+
+  const adminForm  = document.getElementById('admin-form');
   const adminAttemptsInfo = document.getElementById('admin-attempts');
 
   const profileDiv = document.getElementById('profile');
   const userNameSp = document.getElementById('user-name');
-  const logoutBtn = document.getElementById('logout-btn');
-  const adminBanner = document.getElementById('admin-banner');
+  const logoutBtn  = document.getElementById('logout-btn');
 
-  const uploadBtn = document.getElementById('upload-syllabus-btn');
-  const fileInput = document.getElementById('syllabus-file');
+  const uploadBtn  = document.getElementById('upload-syllabus-btn');
+  const fileInput  = document.getElementById('syllabus-file');
+
+  let clearBtn = null;
 
   let selectedTopic = null;
   let currentDifficulty = null;
-  let currentTaskRaw    = "";
-  let isAdmin = false;
-  let syllabusLoaded = false;
-  let adminFails = parseInt(localStorage.getItem('adminFailedAttempts') || '0', 10);
-  let diffPromptMsg = null;            // <-- ссылка на «Select difficulty 👇»
-  let currentHints = [];
-  let hintCount = 0;
+  let currentTaskRaw    = '';
+  let isAdmin           = false;
+  let syllabusLoaded    = false;
+  let adminFails        = parseInt(localStorage.getItem('adminFailedAttempts') || '0', 10);
+  let diffPromptMsg     = null;
+  let currentHints      = [];
+  let hintCount         = 0;
 
   profileDiv.style.display = 'none';
-  logoutBtn.style.display = 'none';
-  userInput.disabled = true;
-  submitCodeBtn.disabled = true;
-  hintBtn.disabled = true;
-  topicsList.innerHTML = '';
+  logoutBtn.style.display  = 'none';
+  userInput.disabled       = true;
+  submitCodeBtn.disabled   = true;
+  hintBtn.disabled         = true;
+  topicsList.innerHTML     = '';
   topicsList.style.display = 'none';
+
   const noTopicsMsg = document.createElement('div');
   noTopicsMsg.textContent = '⏳ Please wait until the administrator uploads the syllabus 😔';
   noTopicsMsg.style.cssText = 'color:#999;text-align:center;margin-top:16px;font-size:14px;';
@@ -51,44 +86,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const hideQuote = () => quoteBlock && (quoteBlock.style.display = 'none');
 
-  const showMessage = (t, s = 'bot') => {
-  const d = document.createElement('div');
-  d.className = `message ${s}`;
-  d.textContent = t;
-  messagesBox.appendChild(d);
-  messagesBox.scrollTop = messagesBox.scrollHeight;
-  return d;                    //  ⬅️  new: give caller a handle
-};
-
+  const showMessage = (t, s='bot') => {
+    const d = document.createElement('div');
+    d.className = `message ${s}`;
+    d.textContent = t;
+    messagesBox.appendChild(d);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+    return d;
+  };
   const makeWaitingNotice = txt => {
-  const node = showMessage(txt, 'bot'); // same styling as other bot msgs
-  return () => node.remove();           // call this when work is done
-};
-
-  const showCodeMessage = c => {
+    const node = showMessage(txt, 'bot');
+    return () => node.remove();
+  };
+  const showCodeMessage = code => {
     const d = document.createElement('div');
     d.className = 'message user';
     const p = document.createElement('pre');
-    p.textContent = c;
+    p.textContent = code;
     d.appendChild(p);
     messagesBox.appendChild(d);
     messagesBox.scrollTop = messagesBox.scrollHeight;
   };
 
-  const fetchEval = async (url, opts = {}) => {
-  const r = await fetch(url, opts);
-  if (!r.ok) throw new Error(await r.text());
-
-  const data = await r.json();   // { correct, feedback } или { message }
-
-  // Если есть message → сразу отдаём
-  if ('message' in data) return data.message;
-
-  // Иначе собираем текст из correct / feedback
-  return `${data.correct ? '✅ Correct solution!' : '❌ Wrong solution.'}`
-       + (data.feedback ? `\n\n${data.feedback}` : '');
-};
-
+  const fetchEval = async (url, opts={}) => {
+    const r = await fetch(url, opts);
+    if (!r.ok) throw new Error(await r.text());
+    const data = await r.json();
+    if ('message' in data) return data.message;
+    return `${data.correct ? '✅ Correct solution!' : '❌ Wrong solution.'}`
+      + (data.feedback ? `\n\n${data.feedback}` : '');
+  };
 
   const updateTopicList = arr => {
     syllabusLoaded = arr.length > 0;
@@ -115,60 +142,68 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  //Function to clear chat messages
-  function clearChat() {
-    messagesBox.innerHTML = '';
-    taskShown = false;
-    answerSent = false;
-    hintBtn.disabled = true;
-    if (quoteBlock) quoteBlock.style.display = 'none';
-  }
-
-  const handleTopic = li => {
-    if (!syllabusLoaded) return;
-    hideQuote();
-    document.querySelectorAll('.sidebar li').forEach(e => e.classList.remove('active-topic'));
-    li.classList.add('active-topic');
-    selectedTopic = li.textContent.trim().toLowerCase().replace(/\s+/g, '_');
-    hintBtn.disabled = true;
-    clearChat();
-    showMessage(li.textContent, 'user');
-    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
-    diffBox.style.display = 'flex';
+  const clearSyllabus = () => {
+    updateTopicList([]);
+    fetch('/clear_syllabus', { method: 'DELETE' }).catch(()=>{});
+    alert('Syllabus cleared');
   };
 
-  fetch('/get_syllabus')
-    .then(r => (r.ok ? r.json() : null))
-    .then(d => {
-      if (d && Array.isArray(d.topics)) updateTopicList(d.topics);
-    })
-    .catch(() => {});
-
-  const openModal = () => loginModal.classList.remove('hidden');
+  const openModal  = () => loginModal.classList.remove('hidden');
   const closeModal = () => loginModal.classList.add('hidden');
   loginBtn.addEventListener('click', openModal);
   modalClose.addEventListener('click', closeModal);
 
   userTab.addEventListener('click', () => {
-    userTab.classList.add('active');
-    adminTab.classList.remove('active');
-    userForm.classList.remove('hidden');
-    adminForm.classList.add('hidden');
+    userTab.classList.add('active'); adminTab.classList.remove('active');
+    loginForm.classList.remove('hidden'); signupForm.classList.add('hidden'); adminForm.classList.add('hidden');
   });
   adminTab.addEventListener('click', () => {
-    adminTab.classList.add('active');
-    userTab.classList.remove('active');
-    adminForm.classList.remove('hidden');
-    userForm.classList.add('hidden');
+    adminTab.classList.add('active'); userTab.classList.remove('active');
+    adminForm.classList.remove('hidden'); loginForm.classList.add('hidden'); signupForm.classList.add('hidden');
+  });
+  goSignup.addEventListener('click', () => {
+    loginForm.classList.add('hidden'); signupForm.classList.remove('hidden');
+    loginError.textContent = '';
+  });
+  goLogin.addEventListener('click', () => {
+    signupForm.classList.add('hidden'); loginForm.classList.remove('hidden');
+    loginError.textContent = '';
   });
 
-  userForm.addEventListener('submit', e => {
+  signupForm.addEventListener('submit', async e => {
     e.preventDefault();
-    const name = document.getElementById('user-name-input').value.trim();
-    const mail = document.getElementById('user-email-input').value.trim();
-    const pwd = document.getElementById('user-password-input').value.trim();
-    if (!name || !mail || !pwd) return;
-    finishLogin(name, false);
+    const name = document.getElementById('su-name').value.trim();
+    const email = document.getElementById('su-email').value.trim();
+    const pwd = document.getElementById('su-password').value.trim();
+    if (!name || !email || !pwd) return;
+    const res = await fetch('/signup', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, email, password: pwd })
+    });
+    if (res.ok) {
+      finishLogin(name, false);
+    } else {
+      alert(await res.text());
+    }
+  });
+
+  loginForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const ident = document.getElementById('li-identifier').value.trim();
+    const pwd   = document.getElementById('li-password').value.trim();
+    if (!ident || !pwd) return;
+    const r = await fetch('/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ identifier: ident, password: pwd })
+    });
+    if (r.ok) {
+      const { name } = await r.json();
+      finishLogin(name, false);
+    } else {
+      loginError.textContent = '❌ Wrong credentials';
+    }
   });
 
   adminForm.addEventListener('submit', e => {
@@ -176,13 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (adminFails >= 3) return;
     const pwd = document.getElementById('admin-password-input').value.trim();
     if (pwd === 'admin123') {
-      adminFails = 0;
-      localStorage.setItem('adminFailedAttempts', '0');
+      adminFails = 0; localStorage.setItem('adminFailedAttempts','0');
       adminAttemptsInfo.textContent = '';
       finishLogin('Admin', true);
     } else {
-      adminFails += 1;
-      localStorage.setItem('adminFailedAttempts', adminFails);
+      adminFails += 1; localStorage.setItem('adminFailedAttempts', adminFails);
       adminAttemptsInfo.textContent = `Wrong password (${adminFails}/3)`;
       if (adminFails >= 3) {
         adminAttemptsInfo.textContent = 'UI locked after 3 failed attempts.';
@@ -200,11 +233,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const finishLogin = (name, admin) => {
     isAdmin = admin;
     profileDiv.style.display = 'flex';
-    logoutBtn.style.display = 'inline-block';
-    userNameSp.textContent = name;
-    loginBtn.style.display = 'none';
+    logoutBtn.style.display  = 'inline-block';
+    userNameSp.textContent   = name;
+    loginBtn.style.display   = 'none';
     adminBanner.classList.toggle('hidden', !admin);
-    uploadBtn.style.display = admin ? 'block' : 'none';
+    uploadBtn.style.display  = admin ? 'block' : 'none';
+
+    if (admin) {
+      if (!clearBtn) {
+        clearBtn = document.createElement('button');
+        clearBtn.id = 'clear-syllabus-btn';
+        clearBtn.className = 'upload-btn';
+        clearBtn.textContent = 'Clear syllabus';
+        clearBtn.style.marginTop = '6px';
+        clearBtn.addEventListener('click', clearSyllabus);
+        uploadBtn.parentNode.insertBefore(clearBtn, uploadBtn.nextSibling);
+      }
+      clearBtn.style.display = 'block';
+    } else if (clearBtn) {
+      clearBtn.style.display = 'none';
+    }
+
     if (admin && !syllabusLoaded) noTopicsMsg.style.display = 'none';
     closeModal();
     adjustLayoutHeight();
@@ -213,225 +262,12 @@ document.addEventListener('DOMContentLoaded', () => {
   logoutBtn.addEventListener('click', () => {
     isAdmin = false;
     profileDiv.style.display = 'none';
-    logoutBtn.style.display = 'none';
-    loginBtn.style.display = 'inline-block';
+    logoutBtn.style.display  = 'none';
+    loginBtn.style.display   = 'inline-block';
     adminBanner.classList.add('hidden');
-    uploadBtn.style.display = 'none';
+    uploadBtn.style.display  = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
     if (!syllabusLoaded) noTopicsMsg.style.display = 'block';
     adjustLayoutHeight();
   });
-
-  uploadBtn.addEventListener('click', () => fileInput.click());
-
-fileInput.setAttribute('accept', '.txt,application/pdf');
-
-fileInput.addEventListener('change', async e => {
-  const f = e.target.files[0];
-  if (!f) return;
-
-  const name = f.name.toLowerCase();
-  if (!name.endsWith('.txt') && !name.endsWith('.pdf')) {
-    return alert('Only .txt and .pdf files allowed');
-  }
-  let text;
-  if (name.endsWith('.txt')) {
-    text = await new Promise(res => {
-      const r = new FileReader();
-      r.onload = () => res(r.result);
-      r.readAsText(f);
-    });
-  } else {
-    const buf = await f.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    let full = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      full += content.items.map(it => it.str).join(' ') + '\n';
-    }
-    text = full;
-  }
-
-  const idx = text.search(/Tentative Course Schedule:/i);
-  const scheduleText = idx >= 0 ? text.slice(idx) : text;
-
-  const endIdx = scheduleText.search(/Means of Evaluation:/i);
-  const scheduleBlock = endIdx >= 0
-    ? scheduleText.slice(0, endIdx)
-    : scheduleText;
-
-  const re = /Week\s*\d+\s+(.+?)(?=Week\s*\d+\s+|$)/gis;
-  const topics = [];
-  let m;
-  while ((m = re.exec(scheduleBlock)) !== null) {
-    topics.push(m[1].trim());
-  }
-
-
-  if (topics.length === 0) {
-    console.log('Parsed chunk:', scheduleText);
-    return alert('No course topics found in the uploaded file.');
-  }
-
-  // 5) Обновляем интерфейс и шлём на сервер
-  updateTopicList(topics);
-  fetch('/save_syllabus', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ topics })
-  }).catch(() => {});
-  alert('Syllabus uploaded ✅');
-});
-
-
-  if (adminFails >= 3) {
-    adminAttemptsInfo.textContent = 'UI locked after 3 failed attempts.';
-    adminForm.querySelector('input').disabled = true;
-    adminForm.querySelector('button').disabled = true;
-  }
-
-  userInput.addEventListener('input', () => {
-    userInput.style.height = 'auto';
-    userInput.style.height = userInput.scrollHeight + 'px';
-  });
-
-  userInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submitCodeBtn.click();
-    }
-  });
-
-window.chooseDifficulty = async level => {
-  if (!syllabusLoaded) return;
-  hideQuote();
-  if (!selectedTopic) {
-    return showMessage('❗️ Please select topic first', 'bot');
-  }
-  currentDifficulty = level;
-
-  if (diffPromptMsg) {
-    diffPromptMsg.remove();
-    diffPromptMsg = null;
-  }
-
-  const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
-  showMessage(labels[level], 'user');
-  const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
-
-  try {
-    const res = await fetch(
-      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
-    );
-    const json = await res.json();
-    console.log("Raw JSON response from backend:", json); 
-    currentTaskRaw = json.task;
-
-    if (!res.ok) {
-      throw new Error(json.error || res.statusText);
-    }
-
-    const taskObj = JSON.parse(json.task);
-    
-    // Proper hint parsing
-    if (taskObj.Hints && typeof taskObj.Hints === 'object') {
-      currentHints = [
-        taskObj.Hints.Hint1 || '',
-        taskObj.Hints.Hint2 || '',
-        taskObj.Hints.Hint3 || ''
-      ].filter(hint => hint.trim() !== '');
-    } else {
-      currentHints = [];
-    }
-
-    hintCount = 0;
-
-    let out = `📝 *${taskObj["Task name"]}*\n\n`;
-    out += `${taskObj["Task description"]}\n\n`;
-    out += `🧪 Sample cases:\n`;
-    taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
-      out += `• Input: ${input} → Expected: ${expected_output}\n`;
-    });
-
-    showMessage(out, 'bot');
-    console.log('Parsed hints:', currentHints);
-  } catch (err) {
-    showMessage(`Error: ${err.message}`, 'bot');
-  } finally {
-    stopNotice();
-  }
-  hintBtn.disabled = true;
-};
-
-
- submitCodeBtn.addEventListener('click', async () => {
-  if (!syllabusLoaded) return;
-  if (!selectedTopic)
-    return showMessage('❗️ Please select topic before sending code', 'bot');
-  if (!currentDifficulty)
-    return showMessage('❗️ Please select difficulty before sending code', 'bot');
-
-  const code = userInput.value.trim();
-  if (!code) return;
-
-  hideQuote();
-  showCodeMessage(code);        // показываем отправленный код
-  hintBtn.disabled = false;
-
-  const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
-
-
-  userInput.value = '';
-  userInput.style.height = 'auto';
-
-  try {
-    const respText = await fetchEval('/submit_code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        topic: selectedTopic,
-        difficulty: currentDifficulty,
-        task:   currentTaskRaw,
-        code
-      })
-    });
-
-    showMessage(respText, 'bot');        // выводим аккуратный фидбек
-  } catch (e) {
-    showMessage(`Error: ${e.message}`, 'bot');
-  } finally {
-    stopNotice();              // ✅ remove notice whatever happens
-  }
-});
-
-
-  hintBtn.addEventListener('click', () => {
-  if (!syllabusLoaded) return;
-  if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
-  if (!currentDifficulty) return showMessage('❗️ Please select difficulty first', 'bot');
-  if (!currentHints.length) return showMessage('❗️ No hints available for this task.', 'bot');
-  if (hintCount >= 3) {
-    showMessage("You’ve used all your hints for this submission. Try improving your code or ask for feedback.", 'bot');
-    return;
-  }
-  showMessage('💡 Hint please! 🥺', 'user');
-  showMessage(`💡 Hint: ${currentHints[hintCount]}`, 'bot');
-  hintCount++;
-});
-
-  const showHintTip = m => {
-    const o = hintWrapper.querySelector('.hint-tooltip');
-    if (o) o.remove();
-    const t = document.createElement('div');
-    t.className = 'hint-tooltip';
-    t.textContent = m;
-    hintWrapper.appendChild(t);
-    setTimeout(() => t.remove(), 3000);
-  };
-
-  hintHelp.addEventListener('click', () => {
-    if (hintBtn.disabled) showHintTip('❗️ Send code to get a hint');
-  });
-
-  adjustLayoutHeight();
 });
