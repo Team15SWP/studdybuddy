@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+    types: [closed]
 
 jobs:
   build-and-test:
@@ -71,7 +72,11 @@ jobs:
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main'
 
     steps:
       - name: Checkout code
