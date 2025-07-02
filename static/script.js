@@ -331,3 +331,4 @@ fileInput.addEventListener('change', async e => {
   }).catch(() => {});
   alert('Syllabus uploaded ✅');
 });
+});
