@@ -141,7 +141,35 @@ document.addEventListener('DOMContentLoaded', () => {
       li.addEventListener('click', () => handleTopic(li));
     });
   };
+  //Function to clear chat messages
+  function clearChat() {
+    messagesBox.innerHTML = '';
+    taskShown = false;
+    answerSent = false;
+    hintBtn.disabled = true;
+    if (quoteBlock) quoteBlock.style.display = 'none';
+  }
 
+  const handleTopic = li => {
+    if (!syllabusLoaded) return;
+    hideQuote();
+    document.querySelectorAll('.sidebar li').forEach(e => e.classList.remove('active-topic'));
+    li.classList.add('active-topic');
+    selectedTopic = li.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+    hintBtn.disabled = true;
+    clearChat();
+    showMessage(li.textContent, 'user');
+    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
+    diffBox.style.display = 'flex';
+  };
+
+  fetch('/get_syllabus')
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      if (d && Array.isArray(d.topics)) updateTopicList(d.topics);
+    })
+    .catch(() => {});
+  
   const clearSyllabus = () => {
     updateTopicList([]);
     fetch('/clear_syllabus', { method: 'DELETE' }).catch(()=>{});
@@ -170,41 +198,22 @@ document.addEventListener('DOMContentLoaded', () => {
     loginError.textContent = '';
   });
 
-  signupForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    const name = document.getElementById('su-name').value.trim();
-    const email = document.getElementById('su-email').value.trim();
-    const pwd = document.getElementById('su-password').value.trim();
-    if (!name || !email || !pwd) return;
-    const res = await fetch('/signup', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, email, password: pwd })
-    });
-    if (res.ok) {
-      finishLogin(name, false);
-    } else {
-      alert(await res.text());
-    }
-  });
+signupForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const name  = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const pwd   = document.getElementById('su-password').value.trim();
+  if (!name || !email || !pwd) return;
+  finishLogin(name, false); // просто логиним, без запроса на сервер
+});
 
-  loginForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    const ident = document.getElementById('li-identifier').value.trim();
-    const pwd   = document.getElementById('li-password').value.trim();
-    if (!ident || !pwd) return;
-    const r = await fetch('/login', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ identifier: ident, password: pwd })
-    });
-    if (r.ok) {
-      const { name } = await r.json();
-      finishLogin(name, false);
-    } else {
-      loginError.textContent = '❌ Wrong credentials';
-    }
-  });
+loginForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const ident = document.getElementById('li-identifier').value.trim();
+  const pwd   = document.getElementById('li-password').value.trim();
+  if (!ident || !pwd) return;
+  finishLogin(ident, false); // просто логиним, без проверки
+});
 
   adminForm.addEventListener('submit', e => {
     e.preventDefault();
@@ -303,7 +312,7 @@ fileInput.addEventListener('change', async e => {
     text = full;
   }
 
-  const idx = text.search(/Tentative Course Schedule:/i);
+const idx = text.search(/Tentative Course Schedule:/i);
   const scheduleText = idx >= 0 ? text.slice(idx) : text;
 
   const endIdx = scheduleText.search(/Means of Evaluation:/i);
@@ -318,11 +327,13 @@ fileInput.addEventListener('change', async e => {
     topics.push(m[1].trim());
   }
 
+
   if (topics.length === 0) {
     console.log('Parsed chunk:', scheduleText);
     return alert('No course topics found in the uploaded file.');
   }
 
+  // 5) Обновляем интерфейс и шлём на сервер
   updateTopicList(topics);
   fetch('/save_syllabus', {
     method: 'POST',
@@ -331,4 +342,156 @@ fileInput.addEventListener('change', async e => {
   }).catch(() => {});
   alert('Syllabus uploaded ✅');
 });
+
+
+  if (adminFails >= 3) {
+    adminAttemptsInfo.textContent = 'UI locked after 3 failed attempts.';
+    adminForm.querySelector('input').disabled = true;
+    adminForm.querySelector('button').disabled = true;
+  }
+
+  userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto';
+    userInput.style.height = userInput.scrollHeight + 'px';
+  });
+
+  userInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitCodeBtn.click();
+    }
+  });
+
+window.chooseDifficulty = async level => {
+  if (!syllabusLoaded) return;
+  hideQuote();
+  if (!selectedTopic) {
+    return showMessage('❗️ Please select topic first', 'bot');
+  }
+  currentDifficulty = level;
+
+  if (diffPromptMsg) {
+    diffPromptMsg.remove();
+    diffPromptMsg = null;
+  }
+
+  const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
+  showMessage(labels[level], 'user');
+  const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
+
+  try {
+    const res = await fetch(
+      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
+    );
+    const json = await res.json();
+    console.log("Raw JSON response from backend:", json); 
+    currentTaskRaw = json.task;
+
+    if (!res.ok) {
+      throw new Error(json.error || res.statusText);
+    }
+
+    const taskObj = JSON.parse(json.task);
+    
+    // Proper hint parsing
+    if (taskObj.Hints && typeof taskObj.Hints === 'object') {
+      currentHints = [
+        taskObj.Hints.Hint1 || '',
+        taskObj.Hints.Hint2 || '',
+        taskObj.Hints.Hint3 || ''
+      ].filter(hint => hint.trim() !== '');
+    } else {
+      currentHints = [];
+    }
+
+    hintCount = 0;
+
+    let out = `📝 *${taskObj["Task name"]}*\n\n`;
+    out += `${taskObj["Task description"]}\n\n`;
+    out += `🧪 Sample cases:\n`;
+    taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
+      out += `• Input: ${input} → Expected: ${expected_output}\n`;
+    });
+
+    showMessage(out, 'bot');
+    console.log('Parsed hints:', currentHints);
+  } catch (err) {
+    showMessage(`Error: ${err.message}`, 'bot');
+  } finally {
+    stopNotice();
+  }
+  hintBtn.disabled = true;
+};
+
+
+ submitCodeBtn.addEventListener('click', async () => {
+  if (!syllabusLoaded) return;
+  if (!selectedTopic)
+    return showMessage('❗️ Please select topic before sending code', 'bot');
+  if (!currentDifficulty)
+    return showMessage('❗️ Please select difficulty before sending code', 'bot');
+
+  const code = userInput.value.trim();
+  if (!code) return;
+
+  hideQuote();
+  showCodeMessage(code);        // показываем отправленный код
+  hintBtn.disabled = false;
+
+  const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
+
+
+  userInput.value = '';
+  userInput.style.height = 'auto';
+
+  try {
+    const respText = await fetchEval('/submit_code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: selectedTopic,
+        difficulty: currentDifficulty,
+        task:   currentTaskRaw,
+        code
+      })
+    });
+
+    showMessage(respText, 'bot');        // выводим аккуратный фидбек
+  } catch (e) {
+    showMessage(`Error: ${e.message}`, 'bot');
+  } finally {
+    stopNotice();              // ✅ remove notice whatever happens
+  }
+});
+
+
+  hintBtn.addEventListener('click', () => {
+  if (!syllabusLoaded) return;
+  if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
+  if (!currentDifficulty) return showMessage('❗️ Please select difficulty first', 'bot');
+  if (!currentHints.length) return showMessage('❗️ No hints available for this task.', 'bot');
+  if (hintCount >= 3) {
+    showMessage("You’ve used all your hints for this submission. Try improving your code or ask for feedback.", 'bot');
+    return;
+  }
+  showMessage('💡 Hint please! 🥺', 'user');
+  showMessage(`💡 Hint: ${currentHints[hintCount]}`, 'bot');
+  hintCount++;
+});
+
+  const showHintTip = m => {
+    const o = hintWrapper.querySelector('.hint-tooltip');
+    if (o) o.remove();
+    const t = document.createElement('div');
+    t.className = 'hint-tooltip';
+    t.textContent = m;
+    hintWrapper.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  };
+
+  hintHelp.addEventListener('click', () => {
+    if (hintBtn.disabled) showHintTip('❗️ Send code to get a hint');
+  });
+
+  adjustLayoutHeight();
 });
