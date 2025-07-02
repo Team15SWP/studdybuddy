@@ -73,11 +73,15 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'main'
+      (github.event_name == 'push' &&
+       github.actor == 'aaammi' &&
+       github.ref == 'refs/heads/main') ||
 
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'closed' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main' &&
+       github.event.pull_request.user.login == 'aaammi')
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
