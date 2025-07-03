@@ -20,7 +20,7 @@ class TestRegisterUser(unittest.TestCase):
         sqlite3.connect = self._original_connect
 
     def test_register_user_success(self):
-        email = f"user_{uuid.uuid4()}@example.com"
+        email = f"user_{uuid.uuid4()}@innopolis.university"
         login = f"user_{uuid.uuid4().hex[:6]}"
         password = "mypassword"
 
