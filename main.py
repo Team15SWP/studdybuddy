@@ -9,6 +9,8 @@ import sqlite3
 import bcrypt
 from pydantic import EmailStr
 
+from database import init_db
+
 import asyncio
 import json
 import logging
@@ -127,6 +129,8 @@ async def _call_llm_async(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="Coding Tasks API")
+# for creating an user table
+init_db() 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ---------------------------------------------------------------------------
