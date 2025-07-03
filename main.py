@@ -5,6 +5,12 @@ split into modules later (api, llm, storage, utils, etc.).
 
 from __future__ import annotations
 
+import sqlite3
+import bcrypt
+from pydantic import EmailStr
+
+from database import init_db
+
 import asyncio
 import json
 import logging
@@ -123,6 +129,8 @@ async def _call_llm_async(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="Coding Tasks API")
+# for creating an user table
+init_db() 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ---------------------------------------------------------------------------
@@ -296,6 +304,62 @@ async def root():
         return HTMLResponse("<h1>No frontend found</h1>", status_code=404)
     return HTMLResponse(index_path.read_text(encoding="utf-8"))
 
+# ---------------------------------------------------------------------------
+# Login and Sign up
+# ---------------------------------------------------------------------------
+
+class SignupInput(BaseModel):
+    email: EmailStr
+    login: str
+    password: str
+
+class LoginInput(BaseModel):
+    identifier: str  # can be email or login
+    password: str
+
+@app.post("/signup")
+async def signup(user: SignupInput):
+    if not user.email.lower().endswith("@innopolis.university"):
+        raise HTTPException(status_code=400, detail="Only @innopolis.university emails allowed")
+
+    try:
+        with sqlite3.connect("users.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM users WHERE LOWER(email) = ?", (user.email.lower(),))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Email already registered")
+
+            cursor.execute("SELECT 1 FROM users WHERE LOWER(login) = ?", (user.login.lower(),))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Login already taken")
+
+            hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
+            cursor.execute(
+                "INSERT INTO users (email, login, password_hash, registration_date) VALUES (?, ?, ?, datetime('now'))",
+                (user.email.lower(), user.login.lower(), hashed)
+            )
+            conn.commit()
+        return {"name": user.login}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=500, detail="Internal DB error")
+
+@app.post("/login")
+async def login(data: LoginInput):
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT login, password_hash FROM users WHERE LOWER(email) = ? OR LOWER(login) = ?",
+            (data.identifier.lower(), data.identifier.lower())
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        login_name, password_hash = row
+        if not bcrypt.checkpw(data.password.encode(), password_hash.encode()):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        return {"name": login_name}
 
 # ---------------------------------------------------------------------------
 # Entry point (for `python main.py`)

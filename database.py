@@ -27,18 +27,55 @@ def init_db():
         conn.commit()
 
 def register_user(email, login, password):
+    if not email.endswith('@innopolis.university'):
+        raise ValueError("Only @innopolis.university emails are allowed")
+
+    if len(password) < 6:
+        raise ValueError("Password must be at least 6 characters long")
+
     try:
         with sqlite3.connect("users.db") as conn:
             cursor = conn.cursor()
+
+            cursor.execute("SELECT 1 FROM users WHERE LOWER(email) = LOWER(?)", (email,))
+            if cursor.fetchone():
+                raise ValueError("Email already registered")
+
+            cursor.execute("SELECT 1 FROM users WHERE LOWER(login) = LOWER(?)", (login,))
+            if cursor.fetchone():
+                raise ValueError("Username already taken")
+
             now = datetime.now().isoformat()
             password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
             cursor.execute("""
                 INSERT INTO users (email, login, password_hash, registration_date)
                 VALUES (?, ?, ?, ?)
             """, (email.lower(), login.lower(), password_hash, now))
             conn.commit()
-    except sqlite3.IntegrityError:
-        raise ValueError("Email or login already registered")
+    except sqlite3.IntegrityError as e:
+        raise ValueError("User already exists")
+
+def login_user(identifier, password):
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT user_id, email, login, password_hash
+            FROM users
+            WHERE LOWER(email) = LOWER(?) OR LOWER(login) = LOWER(?)
+        """, (identifier, identifier))
+        user = cursor.fetchone()
+
+        if not user:
+            raise ValueError("User not found")
+
+        user_id, email, login, password_hash = user
+
+        if not bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
+            raise ValueError("Incorrect password")
+
+        return {"user_id": user_id, "name": login}
 
 def update_score(user_id, points):
     conn = sqlite3.connect("users.db")
