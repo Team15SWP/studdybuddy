@@ -198,22 +198,60 @@ document.addEventListener('DOMContentLoaded', () => {
     loginError.textContent = '';
   });
 
-signupForm.addEventListener('submit', e => {
+signupForm.addEventListener('submit', async e => {
   e.preventDefault();
   const name  = document.getElementById('su-name').value.trim();
   const email = document.getElementById('su-email').value.trim();
   const pwd   = document.getElementById('su-password').value.trim();
   if (!name || !email || !pwd) return;
-  finishLogin(name, false); // просто логиним, без запроса на сервер
+
+  try {
+    const res = await fetch('/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: name, email, password: pwd })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      loginError.textContent = err || 'Registration failed';
+      return;
+    }
+
+    const data = await res.json();
+    finishLogin(data.name, false);  // логиним после успешной регистрации
+  } catch (err) {
+    loginError.textContent = `Error: ${err.message}`;
+  }
 });
 
-loginForm.addEventListener('submit', e => {
+
+loginForm.addEventListener('submit', async e => {
   e.preventDefault();
   const ident = document.getElementById('li-identifier').value.trim();
   const pwd   = document.getElementById('li-password').value.trim();
   if (!ident || !pwd) return;
-  finishLogin(ident, false); // просто логиним, без проверки
+
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: ident, password: pwd })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      loginError.textContent = err || 'Login failed';
+      return;
+    }
+
+    const data = await res.json();
+    finishLogin(data.name, false);
+  } catch (err) {
+    loginError.textContent = `Error: ${err.message}`;
+  }
 });
+
 
   adminForm.addEventListener('submit', e => {
     e.preventDefault();
