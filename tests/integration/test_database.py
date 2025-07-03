@@ -26,15 +26,15 @@ def temp_db(monkeypatch):
 
 def test_register_user(temp_db):
     # Should succeed
-    register_user("test@example.com", "testuser", "password123")
+    register_user("test@innopolis.university", "testuser", "password123")
 
     # Verify data
     with sqlite3.connect(temp_db) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT email, login FROM users WHERE email = ?", ("test@example.com",))
+        cursor.execute("SELECT email, login FROM users WHERE email = ?", ("test@innopolis.university",))
         result = cursor.fetchone()
-        assert result == ("test@example.com", "testuser")
+        assert result == ("test@innopolis.university", "testuser")
 
     # Should raise error on duplicate
     with pytest.raises(ValueError):
-        register_user("test@example.com", "testuser", "password123")
+        register_user("test@innopolis.university", "testuser", "password123")
