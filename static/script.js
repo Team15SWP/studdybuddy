@@ -214,7 +214,7 @@ signupForm.addEventListener('submit', async e => {
 
     if (!res.ok) {
       const err = await res.json();
-      loginError.textContent = err || 'Registration failed';
+      loginError.textContent = err.detail || 'Registration failed';
       return;
     }
 
@@ -241,7 +241,7 @@ loginForm.addEventListener('submit', async e => {
 
     if (!res.ok) {
       const err = await res.json();
-      loginError.textContent = err || 'Login failed';
+      loginError.textContent = err.detail || 'Login failed';
       return;
     }
 
