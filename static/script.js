@@ -213,7 +213,7 @@ signupForm.addEventListener('submit', async e => {
     });
 
     if (!res.ok) {
-      const err = await res.text();
+      const err = await res.json();
       loginError.textContent = err || 'Registration failed';
       return;
     }
@@ -240,7 +240,7 @@ loginForm.addEventListener('submit', async e => {
     });
 
     if (!res.ok) {
-      const err = await res.text();
+      const err = await res.json();
       loginError.textContent = err || 'Login failed';
       return;
     }
