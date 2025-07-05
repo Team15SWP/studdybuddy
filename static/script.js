@@ -168,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
       uploadBtn.style.display = 'none';
     }
   };
+  
   function clearChat() {
     messagesBox.innerHTML = '';
     taskShown = false;
