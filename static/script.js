@@ -63,13 +63,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let selectedTopic = null;
   let currentDifficulty = null;
-  let currentTaskRaw    = '';
-  let isAdmin           = false;
-  let syllabusLoaded    = false;
-  let adminFails        = parseInt(localStorage.getItem('adminFailedAttempts') || '0', 10);
+
+  let currentTaskRaw    = "";
+  let isAdmin = false;
+  let syllabusLoaded = false;
+  let adminFails = parseInt(localStorage.getItem('adminFailedAttempts') || '0', 10);
+  let hintMsg = null;         // <-- ссылка на «Select difficulty 👇»
+  const chats = {};        // { topicKey: [outerHTML, …] }
+  let currentTopicKey = null;
+  let topicMsg = null;
+  const lastTasks = {};
+  const lastDifficulty = {};
   let diffPromptMsg     = null;
   let currentHints      = [];
   let hintCount         = 0;
+
+  const saveToHistory = html => {
+  if (!currentTopicKey) return;              // ещё нет выбранной темы
+  if (!chats[currentTopicKey]) chats[currentTopicKey] = [];
+  chats[currentTopicKey].push(html);
+  };
 
   profileDiv.style.display = 'none';
   logoutBtn.style.display  = 'none';
@@ -86,27 +99,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const hideQuote = () => quoteBlock && (quoteBlock.style.display = 'none');
 
-  const showMessage = (t, s='bot') => {
-    const d = document.createElement('div');
-    d.className = `message ${s}`;
-    d.textContent = t;
-    messagesBox.appendChild(d);
-    messagesBox.scrollTop = messagesBox.scrollHeight;
-    return d;
-  };
-  const makeWaitingNotice = txt => {
-    const node = showMessage(txt, 'bot');
-    return () => node.remove();
-  };
-  const showCodeMessage = code => {
-    const d = document.createElement('div');
-    d.className = 'message user';
-    const p = document.createElement('pre');
-    p.textContent = code;
-    d.appendChild(p);
-    messagesBox.appendChild(d);
-    messagesBox.scrollTop = messagesBox.scrollHeight;
-  };
+/* ----------------------------------------------------------
+   Выводы сообщений и «спиннер ожидания»
+---------------------------------------------------------- */
+const showMessage = (t, role = 'bot') => {
+  const div = document.createElement('div');
+  div.className  = `message ${role}`;
+  div.textContent = t;
+  messagesBox.appendChild(div);
+  messagesBox.scrollTop = messagesBox.scrollHeight;
+
+  // сохраняем в историю открытого чата (кроме подсказки «Select difficulty 👇»)
+  if (t !== 'Select difficulty 👇') {
+    if (!currentTopicKey) return;
+    if (!chats[currentTopicKey]) chats[currentTopicKey] = [];
+    chats[currentTopicKey].push(div.outerHTML);
+  }
+  return div;
+};
+
+const makeWaitingNotice = txt => {
+  const node = showMessage(txt, 'bot'); // тот же стиль, только курсор-часики
+  return () => node.remove();           // вызовите, когда работа закончится
+};
+
+const showCodeMessage = code => {
+  const div = document.createElement('div');
+  div.className = 'message user';
+  const pre = document.createElement('pre');
+  pre.textContent = code;
+  div.appendChild(pre);
+  messagesBox.appendChild(div);
+  messagesBox.scrollTop = messagesBox.scrollHeight;
+
+  // тоже в историю
+  if (!currentTopicKey) return;
+  if (!chats[currentTopicKey]) chats[currentTopicKey] = [];
+  chats[currentTopicKey].push(div.outerHTML);
+};
+
 
   const fetchEval = async (url, opts={}) => {
     const r = await fetch(url, opts);
@@ -151,17 +182,48 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const handleTopic = li => {
-    if (!syllabusLoaded) return;
-    hideQuote();
-    document.querySelectorAll('.sidebar li').forEach(e => e.classList.remove('active-topic'));
-    li.classList.add('active-topic');
-    selectedTopic = li.textContent.trim().toLowerCase().replace(/\s+/g, '_');
+  if (!syllabusLoaded) return;
+  hideQuote();
+
+  /* 1. Убираем старые служебные сообщения */
+  if (hintMsg  && hintMsg.parentNode)  hintMsg.remove();
+  if (topicMsg && topicMsg.parentNode) topicMsg.remove();
+  hintMsg  = null;
+  topicMsg = null;
+
+  /* 2. Сохраняем историю предыдущего чата */
+  if (currentTopicKey !== null) {
+    chats[currentTopicKey] = Array.from(messagesBox.children, el => el.outerHTML);
+  }
+
+  /* 3. Определяем ключ темы и восстанавливаем её историю */
+  selectedTopic   = li.textContent.trim();                          // «Arrays and Strings»
+  currentTopicKey = selectedTopic.toLowerCase().replace(/\s+/g,'_'); // arrays_and_strings
+  currentDifficulty = lastDifficulty[currentTopicKey] ?? null;
+
+  messagesBox.innerHTML = '';
+  if (chats[currentTopicKey]) {
+    messagesBox.innerHTML = chats[currentTopicKey].join('');
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
+
+  /* 4. Подсветка в сайдбаре */
+  document.querySelectorAll('.sidebar li').forEach(e => e.classList.remove('active-topic'));
+  li.classList.add('active-topic');
+
+  /* 5. UI-состояние */
+  const hasTask = Boolean(lastTasks[currentTopicKey]);
+  if (!hasTask) {
     hintBtn.disabled = true;
-    clearChat();
-    showMessage(li.textContent, 'user');
-    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
-    diffBox.style.display = 'flex';
-  };
+    topicMsg = showMessage(selectedTopic, 'user');
+    hintMsg  = showMessage('Select difficulty 👇', 'bot');
+  } else {
+    hintBtn.disabled = false;
+  }
+  diffBox.style.display   = 'flex';
+  submitCodeBtn.disabled  = !hasTask;
+};
+
 
   fetch('/get_syllabus')
     .then(r => (r.ok ? r.json() : null))
@@ -400,80 +462,82 @@ const idx = text.search(/Tentative Course Schedule:/i);
     }
   });
 
-window.chooseDifficulty = async level => {
+  window.chooseDifficulty = async level => {
   if (!syllabusLoaded) return;
   hideQuote();
   if (!selectedTopic) {
-    return showMessage('❗️ Please select topic first', 'bot');
-  }
-  currentDifficulty = level;
-
-  if (diffPromptMsg) {
-    diffPromptMsg.remove();
-    diffPromptMsg = null;
+    return showMessage('❗️ First, choose a theme', 'bot');
   }
 
-  const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
+  const requestKey = currentTopicKey;          // фиксируем чат, из которого пришёл запрос
+  currentDifficulty           = level;
+  lastDifficulty[requestKey]  = level;
+
+  if (hintMsg) { hintMsg.remove(); hintMsg = null; }
+
+  const labels = { beginner:'🟢 Beginner', medium:'🟡 Medium', hard:'🔴 Hard' };
   showMessage(labels[level], 'user');
-  const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
+
+  const stop = makeWaitingNotice('⏳ Generating your exercise, please wait…');
 
   try {
-    const res = await fetch(
-      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
-    );
+    const res  = await fetch(`/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`);
     const json = await res.json();
-    console.log("Raw JSON response from backend:", json); 
-    currentTaskRaw = json.task;
+    if (!res.ok) throw new Error(json.error || res.statusText);
 
-    if (!res.ok) {
-      throw new Error(json.error || res.statusText);
-    }
+    /* кешируем */
+    lastTasks[requestKey] = json.task;
+    if (currentTopicKey === requestKey) currentTaskRaw = json.task;
 
-    const taskObj = JSON.parse(json.task);
-    
-    // Proper hint parsing
-    if (taskObj.Hints && typeof taskObj.Hints === 'object') {
-      currentHints = [
-        taskObj.Hints.Hint1 || '',
-        taskObj.Hints.Hint2 || '',
-        taskObj.Hints.Hint3 || ''
-      ].filter(hint => hint.trim() !== '');
-    } else {
-      currentHints = [];
-    }
+    /* разбираем задачу и подсказки */
+    const t = JSON.parse(json.task);
 
+    currentHints = (t.Hints && typeof t.Hints === 'object')
+      ? [t.Hints.Hint1, t.Hints.Hint2, t.Hints.Hint3].filter(Boolean)
+      : [];
     hintCount = 0;
 
-    let out = `📝 *${taskObj["Task name"]}*\n\n`;
-    out += `${taskObj["Task description"]}\n\n`;
-    out += `🧪 Sample cases:\n`;
-    taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
+    /* вывод */
+    let out = `📝 *${t['Task name']}*\n\n`;
+    out    += `${t['Task description']}\n\n`;
+    out    += '🧪 Sample cases:\n';
+    t['Sample input cases'].forEach(({ input, expected_output }) => {
       out += `• Input: ${input} → Expected: ${expected_output}\n`;
     });
 
-    showMessage(out, 'bot');
-    console.log('Parsed hints:', currentHints);
+    pushToChat(out, 'bot', requestKey);
   } catch (err) {
-    showMessage(`Error: ${err.message}`, 'bot');
+    pushToChat(`Ошибка: ${err.message}`, 'bot', requestKey);
   } finally {
-    stopNotice();
+    stop();
   }
-  hintBtn.disabled = true;
+
+  hintBtn.disabled = true;   // разблокируем после первой отправки решения
 };
+
 
 
  submitCodeBtn.addEventListener('click', async () => {
   if (!syllabusLoaded) return;
+
   if (!selectedTopic)
     return showMessage('❗️ Please select topic before sending code', 'bot');
-  if (!currentDifficulty)
-    return showMessage('❗️ Please select difficulty before sending code', 'bot');
 
+  // задача должна быть в кэше; иначе пользователь ещё не выбрал уровень
+  const taskRaw = lastTasks[currentTopicKey];
+  if (!taskRaw) {
+    return showMessage('❗️ Сначала получите задачу (выберите сложность)', 'bot');
+  }
+
+  // уровень берём из кэша; он нам нужен для POST-запроса
+  currentDifficulty = lastDifficulty[currentTopicKey];
   const code = userInput.value.trim();
   if (!code) return;
 
   hideQuote();
-  showCodeMessage(code);        // показываем отправленный код
+  // showCodeMessage(code);
+  const requestKey = currentTopicKey;   // фиксируем, откуда ушёл запрос
+ pushUserCode(code, requestKey);       // кладём код именно туда
   hintBtn.disabled = false;
 
   const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
@@ -489,14 +553,17 @@ window.chooseDifficulty = async level => {
       body: JSON.stringify({
         topic: selectedTopic,
         difficulty: currentDifficulty,
-        task:   currentTaskRaw,
+        task:   taskRaw,
         code
       })
     });
 
-    showMessage(respText, 'bot');        // выводим аккуратный фидбек
+    // showMessage(respText, 'bot');
+    pushToChat(respText, 'bot', requestKey);
+    if (currentTopicKey === requestKey) hintBtn.disabled = false;
   } catch (e) {
-    showMessage(`Error: ${e.message}`, 'bot');
+    // showMessage(`Error: ${e.message}`, 'bot');
+    pushToChat(`Error: ${e.message}`, 'bot', requestKey);
   } finally {
     stopNotice();              // ✅ remove notice whatever happens
   }
@@ -532,4 +599,48 @@ window.chooseDifficulty = async level => {
   });
 
   adjustLayoutHeight();
+
+
+  /* ------------------------------------------------------------------
+   Добавляет сообщение в историю указанного топика
+   и рисует его в DOM, *только если* этот топик открыт.
+------------------------------------------------------------------ */
+const pushToChat = (text, role, topicKey) => {
+  // 1) гарантируем массив истории
+  if (!chats[topicKey]) chats[topicKey] = [];
+
+  // 2) готовим DOM-элемент
+  const div = document.createElement('div');
+  div.className  = `message ${role}`;
+  div.textContent = text;
+
+  // 3) сохраняем HTML в историю
+  chats[topicKey].push(div.outerHTML);
+
+  // 4) выводим только в действующий чат
+  if (topicKey === currentTopicKey) {
+    messagesBox.appendChild(div);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
+};
+
+const pushUserCode = (code, topicKey) => {
+  const div = document.createElement('div');
+  div.className = 'message user';
+  const pre = document.createElement('pre');
+  pre.textContent = code;
+  div.appendChild(pre);
+
+  // сохраняем
+  if (!chats[topicKey]) chats[topicKey] = [];
+  chats[topicKey].push(div.outerHTML);
+
+  if (topicKey === currentTopicKey) {
+    messagesBox.appendChild(div);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
+};
+
+
 });
+
