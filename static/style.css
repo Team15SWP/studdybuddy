@@ -578,3 +578,6 @@ button {
 #admin-banner.animate-in {
   animation: slideDownAndFadeIn 0.6s ease-in-out forwards;
 }
+.pp-skip-home .homepage        { display:none !important; }
+.pp-skip-home .top-bar,
+.pp-skip-home .layout          { display:flex !important; }
