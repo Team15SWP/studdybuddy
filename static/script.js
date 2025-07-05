@@ -569,7 +569,6 @@ const idx = text.search(/Tentative Course Schedule:/i);
   }
 });
 
-
   hintBtn.addEventListener('click', () => {
   if (!syllabusLoaded) return;
   if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
@@ -599,7 +598,6 @@ const idx = text.search(/Tentative Course Schedule:/i);
   });
 
   adjustLayoutHeight();
-
 
   /* ------------------------------------------------------------------
    Добавляет сообщение в историю указанного топика
@@ -640,7 +638,5 @@ const pushUserCode = (code, topicKey) => {
     messagesBox.scrollTop = messagesBox.scrollHeight;
   }
 };
-
-
 });
 
