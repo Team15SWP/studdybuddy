@@ -1,9 +1,14 @@
+if (sessionStorage.getItem('pp_uiStarted')) {
+  document.documentElement.classList.add('pp-skip-home'); // флаг для CSS
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const homepage     = document.getElementById('homepage');
   const startChatBtn = document.getElementById('start-chat-btn');
   const topBar       = document.querySelector('.top-bar');
   const layoutBox    = document.querySelector('.layout');
   const adminBanner  = document.getElementById('admin-banner');
+  const suError = document.getElementById('su-error');
 
   topBar.classList.add('hidden');
   layoutBox.classList.add('hidden');
@@ -14,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     homepage.addEventListener('animationend', () => {
       homepage.classList.add('hidden');
       homepage.classList.remove('animate-out');
+      sessionStorage.setItem('pp_uiStarted', '1');
       topBar.classList.remove('hidden');
       topBar.classList.add('animate-in');
       layoutBox.classList.remove('hidden');
@@ -43,11 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const userTab    = document.getElementById('user-tab');
   const adminTab   = document.getElementById('admin-tab');
 
-  const loginForm  = document.getElementById('login-form');   // Email + password
-  const signupForm = document.getElementById('signup-form');  // Name + email + password
-  const goSignup   = document.getElementById('go-signup');    // «Sign up!» link
-  const goLogin    = document.getElementById('go-login');     // «Log in!» link
-  const loginError = document.getElementById('login-error');  // div для ошибок
+  const loginForm  = document.getElementById('login-form');
+  const signupForm = document.getElementById('signup-form');
+  const goSignup   = document.getElementById('go-signup');
+  const goLogin    = document.getElementById('go-login');
+  const loginError = document.getElementById('login-error');
 
   const adminForm  = document.getElementById('admin-form');
   const adminAttemptsInfo = document.getElementById('admin-attempts');
@@ -120,28 +126,48 @@ document.addEventListener('DOMContentLoaded', () => {
   const updateTopicList = arr => {
     syllabusLoaded = arr.length > 0;
     topicsList.innerHTML = '';
+
     if (!syllabusLoaded) {
-      topicsList.style.display = 'none';
+      topicsList.style.display  = 'none';
       noTopicsMsg.style.display = isAdmin ? 'none' : 'block';
-      userInput.disabled = true;
-      submitCodeBtn.disabled = true;
-      hintBtn.disabled = true;
-      diffBox.style.display = 'none';
-      selectedTopic = null;
+      userInput.disabled        = true;
+      submitCodeBtn.disabled    = true;
+      selectedTopic             = null;
+
+      if (isAdmin) {
+        uploadBtn.style.display  = 'block';
+        if (clearBtn) clearBtn.style.display = 'none';
+      }
       return;
     }
-    topicsList.style.display = 'block';
+
+    topicsList.style.display  = 'block';
     noTopicsMsg.style.display = 'none';
-    userInput.disabled = false;
-    submitCodeBtn.disabled = false;
+    userInput.disabled        = false;
+    submitCodeBtn.disabled    = false;
+    diffBox.style.display      = 'flex';
+
     arr.forEach(t => {
       const li = document.createElement('li');
       li.textContent = t.trim();
       topicsList.appendChild(li);
       li.addEventListener('click', () => handleTopic(li));
     });
+
+    if (isAdmin) {
+      if (!clearBtn) {
+        clearBtn = document.createElement('button');
+        clearBtn.id          = 'clear-syllabus-btn';
+        clearBtn.className   = 'upload-btn';
+        clearBtn.textContent = 'Clear syllabus';
+        clearBtn.style.marginTop = '6px';
+        clearBtn.addEventListener('click', clearSyllabus);
+        uploadBtn.parentNode.insertBefore(clearBtn, uploadBtn.nextSibling);
+      }
+      clearBtn.style.display  = 'block';
+      uploadBtn.style.display = 'none';
+    }
   };
-  //Function to clear chat messages
   function clearChat() {
     messagesBox.innerHTML = '';
     taskShown = false;
@@ -159,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hintBtn.disabled = true;
     clearChat();
     showMessage(li.textContent, 'user');
-    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
+    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); 
     diffBox.style.display = 'flex';
   };
 
@@ -169,10 +195,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (d && Array.isArray(d.topics)) updateTopicList(d.topics);
     })
     .catch(() => {});
-  
+
   const clearSyllabus = () => {
     updateTopicList([]);
+    diffBox.style.display = 'flex';
+
+    fileInput.value = '';
+
     fetch('/clear_syllabus', { method: 'DELETE' }).catch(()=>{});
+
     alert('Syllabus cleared');
   };
 
@@ -197,60 +228,95 @@ document.addEventListener('DOMContentLoaded', () => {
     signupForm.classList.add('hidden'); loginForm.classList.remove('hidden');
     loginError.textContent = '';
   });
+  const validateSignup = (name, email, pwd) => {
+    const reName  = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
+    const reEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!reName.test(name))  return 'Nickname must be 3-16 latin letters/digits';
+    if (!reEmail.test(email)) return 'Invalid e-mail format';
+    if (pwd.length < 9)      return 'Password must be ≥ 9 chars';
+    if (!/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/\d/.test(pwd))
+      return 'Password needs upper, lower & digit';
+    return '';
+  };
 
-signupForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  const name  = document.getElementById('su-name').value.trim();
-  const email = document.getElementById('su-email').value.trim();
-  const pwd   = document.getElementById('su-password').value.trim();
-  if (!name || !email || !pwd) return;
+  const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', ''];
+  const isLocal         = LOCAL_HOSTNAMES.includes(location.hostname);
+  const getUsers        = () => JSON.parse(localStorage.getItem('pp_users') || '[]');
+  const saveUsers       = users => localStorage.setItem('pp_users', JSON.stringify(users));
+  const errorBox        = suError || loginError;
+  const showSuErr       = msg => { if (errorBox) errorBox.textContent = msg; };
 
-  try {
-    const res = await fetch('/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: name, email, password: pwd })
-    });
+  signupForm.addEventListener('submit', async e => {
+    e.preventDefault();
 
-    if (!res.ok) {
-      const err = await res.json();
-      loginError.textContent = err.detail || 'Registration failed';
+    const name  = document.getElementById('su-name').value.trim();
+    const email = document.getElementById('su-email').value.trim();
+    const pwd   = document.getElementById('su-password').value.trim();
+
+    const err = validateSignup(name, email, pwd);
+    if (err) { showSuErr(err); return; }
+    showSuErr('');
+
+    if (isLocal) {
+      const users = getUsers();
+      if (users.some(u => u.email === email || u.name === name)) {
+        showSuErr('User with this e-mail or nickname already exists');
+        return;
+      }
+      users.push({ name, email, pwd });
+      saveUsers(users);
+      finishLogin(name, false);
+      closeModal();
       return;
     }
 
-    const data = await res.json();
-    finishLogin(data.name, false);  // логиним после успешной регистрации
-  } catch (err) {
-    loginError.textContent = `Error: ${err.message}`;
-  }
-});
+    try {
+      const res = await fetch('/signup', {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({ login: name, email, password: pwd })
+      });
 
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}));
+        showSuErr(data.detail || `Server error (${res.status})`);
+        return;
+      }
 
-loginForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  const ident = document.getElementById('li-identifier').value.trim();
-  const pwd   = document.getElementById('li-password').value.trim();
-  if (!ident || !pwd) return;
-
-  try {
-    const res = await fetch('/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: ident, password: pwd })
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      loginError.textContent = err.detail || 'Login failed';
-      return;
+      const data = await res.json();
+      finishLogin(data.name || name, false);
+      closeModal();
+    } catch (e2) {
+      showSuErr(`Network error: ${e2.message}`);
     }
+  });
 
-    const data = await res.json();
-    finishLogin(data.name, false);
-  } catch (err) {
-    loginError.textContent = `Error: ${err.message}`;
-  }
-});
+
+  loginForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const ident = document.getElementById('li-identifier').value.trim();
+    const pwd   = document.getElementById('li-password').value.trim();
+    if (!ident || !pwd) return;
+
+    try {
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: ident, password: pwd })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        loginError.textContent = err.detail || 'Login failed';
+        return;
+      }
+
+      const data = await res.json();
+      finishLogin(data.name, false);
+    } catch (err) {
+      loginError.textContent = `Error: ${err.message}`;
+    }
+  });
 
 
   adminForm.addEventListener('submit', e => {
@@ -284,9 +350,18 @@ loginForm.addEventListener('submit', async e => {
     userNameSp.textContent   = name;
     loginBtn.style.display   = 'none';
     adminBanner.classList.toggle('hidden', !admin);
-    uploadBtn.style.display  = admin ? 'block' : 'none';
 
-    if (admin) {
+    if (admin && !syllabusLoaded) {
+      uploadBtn.style.display = 'block';
+    } else {
+      uploadBtn.style.display = 'none';
+    }
+
+    if (clearBtn) clearBtn.style.display = 'none';
+
+
+
+    if (admin && syllabusLoaded) {
       if (!clearBtn) {
         clearBtn = document.createElement('button');
         clearBtn.id = 'clear-syllabus-btn';
@@ -318,68 +393,68 @@ loginForm.addEventListener('submit', async e => {
     adjustLayoutHeight();
   });
 
-uploadBtn.addEventListener('click', () => fileInput.click());
+  uploadBtn.addEventListener('click', () => fileInput.click());
 
-fileInput.setAttribute('accept', '.txt,application/pdf');
+  fileInput.setAttribute('accept', '.txt,application/pdf');
 
-fileInput.addEventListener('change', async e => {
-  const f = e.target.files[0];
-  if (!f) return;
+  fileInput.addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
 
-  const name = f.name.toLowerCase();
-  if (!name.endsWith('.txt') && !name.endsWith('.pdf')) {
-    return alert('Only .txt and .pdf files allowed');
-  }
-
-  let text;
-  if (name.endsWith('.txt')) {
-    text = await new Promise(res => {
-      const r = new FileReader();
-      r.onload = () => res(r.result);
-      r.readAsText(f);
-    });
-  } else {
-    const buf = await f.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    let full = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      full += content.items.map(it => it.str).join(' ') + '\n';
+    const name = f.name.toLowerCase();
+    if (!name.endsWith('.txt') && !name.endsWith('.pdf')) {
+      return alert('Only .txt and .pdf files allowed');
     }
-    text = full;
-  }
 
-const idx = text.search(/Tentative Course Schedule:/i);
-  const scheduleText = idx >= 0 ? text.slice(idx) : text;
+    let text;
+    if (name.endsWith('.txt')) {
+      text = await new Promise(res => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.readAsText(f);
+      });
+    } else {
+      const buf = await f.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let full = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        full += content.items.map(it => it.str).join(' ') + '\n';
+      }
+      text = full;
+    }
 
-  const endIdx = scheduleText.search(/Means of Evaluation:/i);
-  const scheduleBlock = endIdx >= 0
-    ? scheduleText.slice(0, endIdx)
-    : scheduleText;
+    const idx = text.search(/Tentative Course Schedule:/i);
+    const scheduleText = idx >= 0 ? text.slice(idx) : text;
 
-  const re = /Week\s*\d+\s+(.+?)(?=Week\s*\d+\s+|$)/gis;
-  const topics = [];
-  let m;
-  while ((m = re.exec(scheduleBlock)) !== null) {
-    topics.push(m[1].trim());
-  }
+    const endIdx = scheduleText.search(/Means of Evaluation:/i);
+    const scheduleBlock = endIdx >= 0
+      ? scheduleText.slice(0, endIdx)
+      : scheduleText;
+
+    const re = /Week\s*\d+\s+(.+?)(?=Week\s*\d+\s+|$)/gis;
+    const topics = [];
+    let m;
+    while ((m = re.exec(scheduleBlock)) !== null) {
+      topics.push(m[1].trim());
+    }
 
 
-  if (topics.length === 0) {
-    console.log('Parsed chunk:', scheduleText);
-    return alert('No course topics found in the uploaded file.');
-  }
+    if (topics.length === 0) {
+      console.log('Parsed chunk:', scheduleText);
+      return alert('No course topics found in the uploaded file.');
+    }
 
-  // 5) Обновляем интерфейс и шлём на сервер
-  updateTopicList(topics);
-  fetch('/save_syllabus', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ topics })
-  }).catch(() => {});
-  alert('Syllabus uploaded ✅');
-});
+    // 5) Обновляем интерфейс и шлём на сервер
+    updateTopicList(topics);
+    fetch('/save_syllabus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topics })
+    }).catch(() => {});
+    alert('Syllabus uploaded ✅');
+  });
 
 
   if (adminFails >= 3) {
@@ -400,122 +475,122 @@ const idx = text.search(/Tentative Course Schedule:/i);
     }
   });
 
-window.chooseDifficulty = async level => {
-  if (!syllabusLoaded) return;
-  hideQuote();
-  if (!selectedTopic) {
-    return showMessage('❗️ Please select topic first', 'bot');
-  }
-  currentDifficulty = level;
+  window.chooseDifficulty = async level => {
+    if (!syllabusLoaded) return;
+    hideQuote();
+    if (!selectedTopic) {
+      return showMessage('❗️ Please select topic first', 'bot');
+    }
+    currentDifficulty = level;
 
-  if (diffPromptMsg) {
-    diffPromptMsg.remove();
-    diffPromptMsg = null;
-  }
-
-  const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
-  showMessage(labels[level], 'user');
-  const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
-
-  try {
-    const res = await fetch(
-      `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
-    );
-    const json = await res.json();
-    console.log("Raw JSON response from backend:", json); 
-    currentTaskRaw = json.task;
-
-    if (!res.ok) {
-      throw new Error(json.error || res.statusText);
+    if (diffPromptMsg) {
+      diffPromptMsg.remove();
+      diffPromptMsg = null;
     }
 
-    const taskObj = JSON.parse(json.task);
-    
-    // Proper hint parsing
-    if (taskObj.Hints && typeof taskObj.Hints === 'object') {
-      currentHints = [
-        taskObj.Hints.Hint1 || '',
-        taskObj.Hints.Hint2 || '',
-        taskObj.Hints.Hint3 || ''
-      ].filter(hint => hint.trim() !== '');
-    } else {
-      currentHints = [];
+    const labels = { beginner: '🟢 Beginner', medium: '🟡 Medium', hard: '🔴 Hard' };
+    showMessage(labels[level], 'user');
+    const stopNotice = makeWaitingNotice('⏳ Generating your exercise, please wait…');
+
+    try {
+      const res = await fetch(
+        `/generate_task?topic=${encodeURIComponent(selectedTopic)}&difficulty=${encodeURIComponent(level)}`
+      );
+      const json = await res.json();
+      console.log("Raw JSON response from backend:", json);
+      currentTaskRaw = json.task;
+
+      if (!res.ok) {
+        throw new Error(json.error || res.statusText);
+      }
+
+      const taskObj = JSON.parse(json.task);
+
+      // Proper hint parsing
+      if (taskObj.Hints && typeof taskObj.Hints === 'object') {
+        currentHints = [
+          taskObj.Hints.Hint1 || '',
+          taskObj.Hints.Hint2 || '',
+          taskObj.Hints.Hint3 || ''
+        ].filter(hint => hint.trim() !== '');
+      } else {
+        currentHints = [];
+      }
+
+      hintCount = 0;
+
+      let out = `📝 *${taskObj["Task name"]}*\n\n`;
+      out += `${taskObj["Task description"]}\n\n`;
+      out += `🧪 Sample cases:\n`;
+      taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
+        out += `• Input: ${input} → Expected: ${expected_output}\n`;
+      });
+
+      showMessage(out, 'bot');
+      console.log('Parsed hints:', currentHints);
+    } catch (err) {
+      showMessage(`Error: ${err.message}`, 'bot');
+    } finally {
+      stopNotice();
     }
-
-    hintCount = 0;
-
-    let out = `📝 *${taskObj["Task name"]}*\n\n`;
-    out += `${taskObj["Task description"]}\n\n`;
-    out += `🧪 Sample cases:\n`;
-    taskObj["Sample input cases"].forEach(({ input, expected_output }) => {
-      out += `• Input: ${input} → Expected: ${expected_output}\n`;
-    });
-
-    showMessage(out, 'bot');
-    console.log('Parsed hints:', currentHints);
-  } catch (err) {
-    showMessage(`Error: ${err.message}`, 'bot');
-  } finally {
-    stopNotice();
-  }
-  hintBtn.disabled = true;
-};
+    hintBtn.disabled = true;
+  };
 
 
- submitCodeBtn.addEventListener('click', async () => {
-  if (!syllabusLoaded) return;
-  if (!selectedTopic)
-    return showMessage('❗️ Please select topic before sending code', 'bot');
-  if (!currentDifficulty)
-    return showMessage('❗️ Please select difficulty before sending code', 'bot');
+  submitCodeBtn.addEventListener('click', async () => {
+    if (!syllabusLoaded) return;
+    if (!selectedTopic)
+      return showMessage('❗️ Please select topic before sending code', 'bot');
+    if (!currentDifficulty)
+      return showMessage('❗️ Please select difficulty before sending code', 'bot');
 
-  const code = userInput.value.trim();
-  if (!code) return;
+    const code = userInput.value.trim();
+    if (!code) return;
 
-  hideQuote();
-  showCodeMessage(code);        // показываем отправленный код
-  hintBtn.disabled = false;
+    hideQuote();
+    showCodeMessage(code);        // показываем отправленный код
+    hintBtn.disabled = false;
 
-  const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
+    const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
 
 
-  userInput.value = '';
-  userInput.style.height = 'auto';
+    userInput.value = '';
+    userInput.style.height = 'auto';
 
-  try {
-    const respText = await fetchEval('/submit_code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        topic: selectedTopic,
-        difficulty: currentDifficulty,
-        task:   currentTaskRaw,
-        code
-      })
-    });
+    try {
+      const respText = await fetchEval('/submit_code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: selectedTopic,
+          difficulty: currentDifficulty,
+          task:   currentTaskRaw,
+          code
+        })
+      });
 
-    showMessage(respText, 'bot');        // выводим аккуратный фидбек
-  } catch (e) {
-    showMessage(`Error: ${e.message}`, 'bot');
-  } finally {
-    stopNotice();              // ✅ remove notice whatever happens
-  }
-});
+      showMessage(respText, 'bot');        // выводим аккуратный фидбек
+    } catch (e) {
+      showMessage(`Error: ${e.message}`, 'bot');
+    } finally {
+      stopNotice();              // ✅ remove notice whatever happens
+    }
+  });
 
 
   hintBtn.addEventListener('click', () => {
-  if (!syllabusLoaded) return;
-  if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
-  if (!currentDifficulty) return showMessage('❗️ Please select difficulty first', 'bot');
-  if (!currentHints.length) return showMessage('❗️ No hints available for this task.', 'bot');
-  if (hintCount >= 3) {
-    showMessage("You’ve used all your hints for this submission. Try improving your code or ask for feedback.", 'bot');
-    return;
-  }
-  showMessage('💡 Hint please! 🥺', 'user');
-  showMessage(`💡 Hint: ${currentHints[hintCount]}`, 'bot');
-  hintCount++;
-});
+    if (!syllabusLoaded) return;
+    if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
+    if (!currentDifficulty) return showMessage('❗️ Please select difficulty first', 'bot');
+    if (!currentHints.length) return showMessage('❗️ No hints available for this task.', 'bot');
+    if (hintCount >= 3) {
+      showMessage("You’ve used all your hints for this submission. Try improving your code or ask for feedback.", 'bot');
+      return;
+    }
+    showMessage('💡 Hint please! 🥺', 'user');
+    showMessage(`💡 Hint: ${currentHints[hintCount]}`, 'bot');
+    hintCount++;
+  });
 
   const showHintTip = m => {
     const o = hintWrapper.querySelector('.hint-tooltip');
