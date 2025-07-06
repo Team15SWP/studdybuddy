@@ -1,8 +1,5 @@
 **CONTRIBUTING.md**
 
-This file outlines instructions for installing, running, testing, and contributing to the project.
-
----
 
 # 1. Project Overview
 
@@ -17,7 +14,7 @@ CHANGELOG.md            # project changelog
 Dockerfile.backend      # Dockerfile for backend image
 Dockerfile.nginx        # Dockerfile for Nginx image
 docker-compose.yml      # local multi-container setup
-nginx.conf              # Nginx configuration
+inginx.conf              # Nginx configuration
 main.py                 # FastAPI application entry point
 database.py             # database initialization script
 requirements.txt        # Python dependencies
@@ -25,6 +22,10 @@ static/                 # frontend static files (HTML, JS, CSS)
 tests/                  # test suites
   ├─ unit_tests/        # unit tests
   └─ integration/       # integration tests
+venv/                   # Python virtual environment (ignored)
+__pycache__/            # Python cache (ignored)
+LICENSE
+.gitignore
 ```
 
 # 3. Prerequisites
@@ -142,7 +143,35 @@ If you find a bug:
    * **Expected vs. Actual Behavior**
    * **Environment:** OS, Python version, Docker version
 
-# 10. License
+# 10. Kanban Board & Git Workflow
+
+* **Kanban Board**: We use [GitHub Projects](https://github.com/<org>/<repo>/projects) to track tasks:
+
+  1. **To Do**: backlog of approved tasks.
+  2. **In Progress**: tasks currently being worked on.
+  3. **Review**: completed tasks awaiting PR review.
+  4. **Done**: merged and deployed tasks.
+
+* **Git Workflow**:
+
+  * **Branch naming**: use descriptive names reflecting the change, for example:
+
+    * `add-login-api`
+    * `update-user-model`
+    * `fix-auth-redirect`
+  * Include the relevant issue number in the branch name or PR description when applicable (e.g., `123-add-login-api`).
+  * Create a Pull Request from your branch to `main`. The PR must pass CI checks and reference the related issue before merging.
+  * After merging, delete the branch to keep the repository clean.
+
+# 11. Secrets Management Secrets Management
+
+* Store secrets (API keys, database credentials) in GitHub Secrets under repository Settings > Secrets.
+* Reference secrets in GitHub Actions workflows via `${{ secrets.SECRET_NAME }}`.
+* Locally, use a `.env` file (ignored by `.gitignore`) with variables like `DATABASE_URL`, `SECRET_KEY`, `SMTP_PASSWORD`.
+* Load environment variables in code using `python-dotenv` or similar libraries.
+* Never commit secrets or `.env` files to the repository.
+
+# 12. License
 
 This project is licensed under the [MIT License](LICENSE).
 
