@@ -1,6 +1,6 @@
 # StudyBuddy <!-- Logo placeholder below -->
 
-![StudyBuddy Logo](relative/path/to/logo.png)
+🐍 Python Practice
 
 ---
 
@@ -60,10 +60,9 @@ Together this forms a lightweight learning‑platform experience without the ove
 * [x] Admin mode via special password
 * [x] Teacher syllabus upload
 
-###  MVP v2 – Enhanced UX
+### ✓ MVP v2 – Enhanced UX
 
-* [] Complete UI polish
-* [] Email reminders
+* [x] Email reminders
 * [x] Progress tracker dashboard
 * [x] “Learning‑platform” niceties (badges, streaks)
 
@@ -125,8 +124,4 @@ docker compose up --build  # serves at http://localhost:8000
 ```
 
 ---
-
-## License
-
-This project is released under the **MIT License**. See `LICENSE` for details.
 
