@@ -1,5 +1,5 @@
 if (sessionStorage.getItem('pp_uiStarted')) {
-  document.documentElement.classList.add('pp-skip-home'); // флаг для CSS
+  document.documentElement.classList.add('pp-skip-home'); 
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -64,6 +64,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const uploadBtn  = document.getElementById('upload-syllabus-btn');
   const fileInput  = document.getElementById('syllabus-file');
+
+  const scoreBtn    = document.getElementById('score-btn');
+  const scoreCntSp  = document.getElementById('score-count');
+  const scoreModal  = document.getElementById('score-modal');
+  const scoreClose  = document.getElementById('score-close');
+  const scoreText   = document.getElementById('score-text');
+
+  let solvedCount = 0;
+
+  const scoreKey = () => 'pp_solved_' + (userNameSp.textContent || 'anon');
+
+  const loadScore = () => {
+    solvedCount = parseInt(localStorage.getItem(scoreKey()) || '0', 10);
+    updateScoreDisplay();
+  };
+  const saveScore = () => localStorage.setItem(scoreKey(), solvedCount);
+
+  const updateScoreDisplay = () => {
+    scoreCntSp.textContent = solvedCount;
+    scoreText.textContent  =
+      `You have solved ${solvedCount} task${solvedCount === 1 ? '' : 's'} 🎉`;
+  };
+
+  scoreBtn.addEventListener('click', () => {
+    updateScoreDisplay();
+    scoreModal.classList.remove('hidden');
+  });
+  scoreClose.addEventListener('click',
+    () => scoreModal.classList.add('hidden'));
 
   let clearBtn = null;
 
@@ -168,7 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
       uploadBtn.style.display = 'none';
     }
   };
-  
   function clearChat() {
     messagesBox.innerHTML = '';
     taskShown = false;
@@ -186,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hintBtn.disabled = true;
     clearChat();
     showMessage(li.textContent, 'user');
-    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); 
+    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
     diffBox.style.display = 'flex';
   };
 
@@ -378,6 +406,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (admin && !syllabusLoaded) noTopicsMsg.style.display = 'none';
+    scoreBtn.classList.remove('hidden');
+    loadScore()
     closeModal();
     adjustLayoutHeight();
   };
@@ -392,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (clearBtn) clearBtn.style.display = 'none';
     if (!syllabusLoaded) noTopicsMsg.style.display = 'block';
     adjustLayoutHeight();
+    scoreBtn.classList.add('hidden');
   });
 
   uploadBtn.addEventListener('click', () => fileInput.click());
@@ -446,8 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Parsed chunk:', scheduleText);
       return alert('No course topics found in the uploaded file.');
     }
-
-    // 5) Обновляем интерфейс и шлём на сервер
+    
     updateTopicList(topics);
     fetch('/save_syllabus', {
       method: 'POST',
@@ -507,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const taskObj = JSON.parse(json.task);
 
-      // Proper hint parsing
+      
       if (taskObj.Hints && typeof taskObj.Hints === 'object') {
         currentHints = [
           taskObj.Hints.Hint1 || '',
@@ -549,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!code) return;
 
     hideQuote();
-    showCodeMessage(code);        // показываем отправленный код
+    showCodeMessage(code);        
     hintBtn.disabled = false;
 
     const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
@@ -570,11 +600,16 @@ document.addEventListener('DOMContentLoaded', () => {
         })
       });
 
-      showMessage(respText, 'bot');        // выводим аккуратный фидбек
+      showMessage(respText, 'bot');
+      if (respText.startsWith('✅')) {
+        solvedCount += 1;
+        saveScore();
+        updateScoreDisplay();
+      }
     } catch (e) {
       showMessage(`Error: ${e.message}`, 'bot');
     } finally {
-      stopNotice();              // ✅ remove notice whatever happens
+      stopNotice();              
     }
   });
 
