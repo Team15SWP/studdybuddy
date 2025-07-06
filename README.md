@@ -1,10 +1,4 @@
-# StudyBuddy <!-- Logo placeholder below -->
-
-🐍 Python Practice
-
----
-
-## One‑Sentence Pitch
+# StudyBuddy 🐍
 
 **StudyBuddy** is a web‑based AI chatbot that ingests your Python‑course syllabus, generates leveled coding challenges, checks solutions, hints when you’re stuck, and keeps you on track with customizable notifications.
 
@@ -19,7 +13,7 @@
 
 ## Project Story
 
-Learning to program is equal parts *practice* and *pacing*.  Students often fall behind because they (a) don’t know which exercises match the current topic, or (b) lose momentum between classes.
+Learning to program is equal parts *practice* and *pacing*.  Students often fall behind because they (a) don’t know which exercises match the current topic, or (b) not enough practice.
 
 **StudyBuddy** solves both problems in one place:
 
@@ -39,7 +33,7 @@ Together this forms a lightweight learning‑platform experience without the ove
 | **Client**                                                       | Naveed Zafar                                         |
 | **Target Users**                                                 | University students taking *Programming in Python*   |
 | **External Services**                                            | • **DeepSeek** – task & hint generation              |                                                     
-|                                                                  | • **PostgreSQL** – persistent user data & progress   |
+|                                                                  | • **LiteSQL** – persistent user data & progress   |
 |                                                                  | • **Email** – outbound reminders                     |
 
 ---
@@ -55,7 +49,7 @@ Together this forms a lightweight learning‑platform experience without the ove
 
 ### ✓ MVP v1 – Syllabus & Access System
 
-* [x] Syllabus **.txt** upload
+* [x] Syllabus **.txt** and **.pdf** upload
 * [x] Registration & login
 * [x] Admin mode via special password
 * [x] Teacher syllabus upload
@@ -95,33 +89,37 @@ Together this forms a lightweight learning‑platform experience without the ove
 
 ## Installation & Run (Developers)
 
-> Requires **Python 3.11+** and **Node 18+**.
+> Requires **Python 3.11+**.
 
-### Clone & Backend
-
+### Local Setup
 ```bash
-git clone https://github.com/<your‑org>/studybuddy.git
-cd studybuddy/backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-# Environment vars (edit .env):
-#   OPENAI_API_KEY, DATABASE_URL, EMAIL_API_KEY, ADMIN_PASSWD, …
-uvicorn app.main:app --reload  # FastAPI
+# 1. Clone the repository
+git clone https://github.com/<your-org>/studybuddy.git
+cd studybuddy
+
+# 2. Create & activate a virtual environment
+python -m venv .venv
+# On Windows:
+.\.venv\Scripts\activate
+# On macOS/Linux:
+# source .venv/bin/activate
+
+# 3. Install Python dependencies
+pip install requirements.txt
+
+# 4. Set environment variables (in a .env file):
+# OPENROUTER_API_KEY=your_openrouter_key
+# ADMIN_PASSWD=your_admin_password
+# DATABASE_URL=postgresql://user:pass@localhost/dbname
+# EMAIL_API_KEY=your_email_service_key
+
+# 5. Run the backend server
+uvicorn main:app --reload --port 8005
 ```
-
-### Frontend
-
-```bash
-cd ../frontend
-npm install
-npm run dev  # Vite + React
+### Docker Compose
 ```
-
-### Docker (all‑in‑one)
-
-```bash
-docker compose up --build  # serves at http://localhost:8000
+# Build and start services (FastAPI + Nginx)
+docker compose up --build
 ```
-
 ---
 
