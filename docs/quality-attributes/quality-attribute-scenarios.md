@@ -1,19 +1,19 @@
-# Сценарии качественных характеристик
+# Quality Attribute Scenarios
 
-## Надёжность  
-**Сценарий:** При перезапуске сервиса (например, после обновления) данные восстанавливаются, и система продолжает работу без потери информации.
+## Reliability  
+**Scenario:** Upon service restart (e.g., after an update), data is recovered and the system continues operating without any data loss.
 
-## Доступность  
-**Сценарий:** Сервис доступен не менее чем 99 % времени в течение календарного месяца (непрерывная работа, не считая планового обслуживания).
+## Availability  
+**Scenario:** The service is available at least 99 % of the time during a calendar month (continuous operation, excluding scheduled maintenance).
 
-**## Безопасность  
-**Сценарий 2:** При попытке регистрации с электронной почтой, которая уже используется в системе (даже если введён другой пароль), сервер возвращает сообщение «Email already registered».  
+## Security  
+**Scenario 2:** When attempting to register with an email address that is already in use (even if a different password is provided), the server returns the message “Email already registered.”
 
-## Удобство использования  
-**Сценарий:** Новый пользователь завершает регистрацию и входит в систему за не более чем 3 минуты без подсказок.
+## Usability  
+**Scenario:** A new user completes registration and logs in within 3 minutes without any external guidance.
 
-## Поддерживаемость  
-**Сценарий:** Добавление нового модуля в систему или обновление зависимости занимает не более 1 часа разработчика, и при этом все автоматические тесты проходят успешно.
+## Maintainability  
+**Scenario:** Adding a new module or updating a dependency takes no more than 1 hour of developer effort, and all automated tests still pass successfully.
 
-## Производительность  
-**Сценарий:** Система обрабатывает 95 % запросов за время не более 300 мс при обычной нагрузке.
+## Performance  
+**Scenario:** The system processes 95 % of requests in 300 ms or less under normal load.
