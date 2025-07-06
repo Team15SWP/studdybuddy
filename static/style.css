@@ -450,7 +450,6 @@ button {
   animation: gradientShiftText 5s ease infinite;
 }
 
-/* ─── Particle background ─── */
 .particle-container {
   position: absolute;
   inset: 0;
@@ -581,3 +580,17 @@ button {
 .pp-skip-home .homepage        { display:none !important; }
 .pp-skip-home .top-bar,
 .pp-skip-home .layout          { display:flex !important; }
+.score-btn{
+  background:#22c55e;
+  color:#000;
+  padding:8px 20px;
+  border-radius:10px;
+  border:none;
+  cursor:pointer;
+  font-size:14px;
+  transition:background .2s,transform .2s;
+}
+.score-btn:hover{
+  background:#4ade80;
+  transform:scale(1.05);
+}
