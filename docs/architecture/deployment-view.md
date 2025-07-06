@@ -6,9 +6,9 @@ This document describes how the system is deployed using Docker containers, and 
 
 - The application is containerized using Docker Compose.
 - It includes the following containers:
-  - **nginx** (port 80): Serves static frontend files and acts as a reverse proxy to the backend.
-  - **backend** (port 8000): FastAPI server with business logic, exposed behind nginx.
-  - **db** (port 5432): PostgreSQL database container used to store user data, history, and notifications.
+  - **nginx**: Serves static frontend files and acts as a reverse proxy to the backend.
+  - **backend**: FastAPI server with business logic, exposed behind nginx.
+  - **db**: PostgreSQL database container used to store user data, history, and notifications.
 
 ## Network and Communication
 
