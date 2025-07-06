@@ -2,7 +2,6 @@
 solutions. The code is structured in a single file for simplicity, but can be
 split into modules later (api, llm, storage, utils, etc.).
 """
-
 from __future__ import annotations
 
 import sqlite3
