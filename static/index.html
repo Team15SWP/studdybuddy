@@ -34,6 +34,9 @@
   <div class="logo">🐍 Python Practice</div>
   <div class="right-controls">
     <div id="profile" class="profile">
+      <button id="score-btn" class="score-btn hidden">
+        Score: <span id="score-count">0</span>
+      </button>
       <div id="user-avatar" class="user-avatar">👤</div>
       <div id="user-name" class="user-name"></div>
       <button id="logout-btn" class="logout">Log out</button>
@@ -78,6 +81,14 @@
 </div>
 
 <div id="login-modal" class="modal hidden">
+  <div id="score-modal" class="modal hidden">
+    <div class="modal-content">
+      <span id="score-close" class="modal-close">&times;</span>
+      <h2 style="text-align:center;margin-top:0">🏆 Your Progress</h2>
+      <p id="score-text"
+         style="font-size:24px;text-align:center;margin:20px 0">0</p>
+    </div>
+  </div>
   <div class="modal-content">
     <span id="modal-close" class="modal-close">&times;</span>
 
