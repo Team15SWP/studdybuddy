@@ -23,10 +23,10 @@ Learning to program is equal parts *practice* and *pacing*.  Students often fall
 
 **StudyBuddy** solves both problems in one place:
 
-1. **Auto‑curated practice** – Upload a course syllabus and the bot proposes relevant tasks for each lecture, from warm‑up to advanced.
+1. **Auto‑curated practice** – Upload a course syllabus and the bot proposes relevant tasks for each lecture, from beginner to advanced.
 2. **Real‑time checking & hints** – The built‑in evaluator runs submitted code in a sandbox and reports pass/fail, plus incremental hints.
-3. **Progress tracker** – Visual dashboard shows which topics are mastered and which need attention.
-4. **Smart reminders** – Customizable email/Push notifications nudge students to practice just enough, right on schedule.
+3. **Progress tracker** – Tracks your overall practice progress, such as total number of problems solved.
+4. **Smart reminders** – Customizable email notifications nudge students to practice just enough, right on schedule.
 
 Together this forms a lightweight learning‑platform experience without the overhead of a full LMS.
 
@@ -38,10 +38,9 @@ Together this forms a lightweight learning‑platform experience without the ove
 | ---------------------------------------------------------------- | ---------------------------------------------------- |
 | **Client**                                                       | Naveed Zafar                                         |
 | **Target Users**                                                 | University students taking *Programming in Python*   |
-| **External Services**                                            | • **OpenAI API / DeepSeek** – task & hint generation |
-| • **Judge0 API** (or similar) – secure code execution/evaluation |                                                      |
-| • **PostgreSQL** – persistent user data & progress               |                                                      |
-| • **Email/SMS Gateway** – outbound reminders (SendGrid / Twilio) |                                                      |
+| **External Services**                                            | • **DeepSeek** – task & hint generation              |                                                     
+|                                                                  | • **PostgreSQL** – persistent user data & progress   |
+|                                                                  | • **Email** – outbound reminders                     |
 
 ---
 
@@ -82,19 +81,17 @@ Together this forms a lightweight learning‑platform experience without the ove
 
 1. **Visit the app** → *http://194.31.174.125/*.
 2. **Sign Up / Log In**: email + password.
-   *Admin?* Click *“Admin Login”* and enter the teacher password.
+   *Admin?* Click *“Admin Login”* and enter password.
 3. **Students**:
 
-   1. Pick today’s topic → receive auto‑generated tasks.
-   2. Choose difficulty (Easy / Medium / Hard).
+   1. Pick topic.
+   2. Choose difficulty (Easy / Medium / Hard)  → receive auto‑generated tasks.
    3. Code in the built‑in editor, hit **Run & Check**.
    4. View result, ask for a *Hint* if needed.
-   5. Track your progress bar & streaks on the dashboard.
+   5. Track your progress bar.
 4. **Admins**:
 
-   1. Upload or edit the course syllabus (plain‑text outline).
-   2. Monitor aggregate progress in the *Instructor* panel.
-
+   1. Upload or edit the course syllabus.
 ---
 
 ## Installation & Run (Developers)
