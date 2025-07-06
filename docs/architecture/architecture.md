@@ -17,6 +17,6 @@ The system consists of the following components:
 
 ## View Links
 
-* [Static View](static-view/)
-* [Dynamic View](dynamic-view/)
-* [Deployment View](deployment-view/)
+* [Static View](static-view.md)
+* [Dynamic View](dynamic-view.md)
+* [Deployment View](deployment-view.md)
