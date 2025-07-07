@@ -7,7 +7,7 @@
 |                | Link  |
 | -------------- | ----- |
 | **Live App**   | http://194.31.174.125/ |
-| **Demo Video** | *TBA* |
+| **Demo Video** | https://disk.yandex.ru/i/kHkq3orwnzELYw |
 
 ---
 
@@ -33,7 +33,7 @@ Together this forms a lightweight learning‑platform experience without the ove
 | **Client**                                                       | Naveed Zafar                                         |
 | **Target Users**                                                 | University students taking *Programming in Python*   |
 | **External Services**                                            | • **DeepSeek** – task & hint generation              |                                                     
-|                                                                  | • **LiteSQL** – persistent user data & progress   |
+|                                                                  | • **MySQL** – persistent user data & progress   |
 |                                                                  | • **Email** – outbound reminders                     |
 
 ---
