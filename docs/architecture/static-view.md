@@ -26,7 +26,7 @@
 - LLM Integration Module
 - AI Logic
 - History Manager
-- Database (SQLite or PostgreSQL)
+- Database (SQLite)
 - CI/CD and Deployment (e.g., GitHub Actions, Render)
 
 ## Diagram
