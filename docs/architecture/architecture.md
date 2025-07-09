@@ -11,7 +11,7 @@ The system consists of the following components:
 ## Tech Stack
 
 * **Backend**: Python + FastAPI
-* **Database**: MySQL
+* **Database**: SQLite
 * **Frontend**: HTML, CSS, JavaScript
 * **Infrastructure**: Docker, Docker Compose, Nginx
 
