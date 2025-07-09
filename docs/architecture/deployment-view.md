@@ -8,7 +8,7 @@ This document describes how the system is deployed using Docker containers, and 
 - It includes the following containers:
   - **nginx**: Serves static frontend files and acts as a reverse proxy to the backend.
   - **backend**: FastAPI server with business logic, exposed behind nginx.
-  - **db**: PostgreSQL database container used to store user data, history, and notifications.
+  - **db**: SQLite database container used to store user data, history, and notifications.
 
 ## Network and Communication
 
