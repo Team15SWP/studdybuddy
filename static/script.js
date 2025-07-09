@@ -1,7 +1,6 @@
 if (sessionStorage.getItem('pp_uiStarted')) {
   document.documentElement.classList.add('pp-skip-home'); 
 }
-
 document.addEventListener('DOMContentLoaded', () => {
   const homepage     = document.getElementById('homepage');
   const startChatBtn = document.getElementById('start-chat-btn');
@@ -72,6 +71,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const scoreText   = document.getElementById('score-text');
 
   let solvedCount = 0;
+  const chats          = {};   // { topicKey: [outerHTML,…] }
+  const lastTasks      = {};   // { topicKey: rawTaskJSON }
+  const lastDifficulty = {};   // { topicKey: 'beginner' | 'medium' | 'hard' }
+
+  let currentTopicKey  = null; // snake_case ключ выбранной темы
+  let attemptMade = false;
 
   const scoreKey = () => 'pp_solved_' + (userNameSp.textContent || 'anon');
 
@@ -121,14 +126,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const hideQuote = () => quoteBlock && (quoteBlock.style.display = 'none');
 
-  const showMessage = (t, s='bot') => {
-    const d = document.createElement('div');
-    d.className = `message ${s}`;
-    d.textContent = t;
-    messagesBox.appendChild(d);
-    messagesBox.scrollTop = messagesBox.scrollHeight;
-    return d;
+  const showMessage = (text, role = 'bot') => {
+  const div = document.createElement('div');
+  div.className  = `message ${role}`;
+  div.textContent = text;
+  messagesBox.appendChild(div);
+  messagesBox.scrollTop = messagesBox.scrollHeight;
+
+  if (currentTopicKey) {               // тема уже выбрана
+    if (!chats[currentTopicKey]) chats[currentTopicKey] = [];
+    chats[currentTopicKey].push(div.outerHTML);
+  }
+  return div;
   };
+
+  const pushToChat = (text, role, topicKey) => {
+  if (!chats[topicKey]) chats[topicKey] = [];
+  const div = document.createElement('div');
+  div.className  = `message ${role}`;
+  div.textContent = text;
+  chats[topicKey].push(div.outerHTML);
+
+  if (topicKey === currentTopicKey) {          // чат открыт
+    messagesBox.appendChild(div);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
+  };
+
+  const pushUserCode = (code, topicKey) => {
+  const div = document.createElement('div');
+  div.className = 'message user';
+  const pre = document.createElement('pre');
+  pre.textContent = code;
+  div.appendChild(pre);
+
+  if (!chats[topicKey]) chats[topicKey] = [];
+  chats[topicKey].push(div.outerHTML);
+
+  if (topicKey === currentTopicKey) {
+    messagesBox.appendChild(div);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
+  };
+
+
   const makeWaitingNotice = txt => {
     const node = showMessage(txt, 'bot');
     return () => node.remove();
@@ -206,17 +247,52 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const handleTopic = li => {
-    if (!syllabusLoaded) return;
-    hideQuote();
-    document.querySelectorAll('.sidebar li').forEach(e => e.classList.remove('active-topic'));
-    li.classList.add('active-topic');
-    selectedTopic = li.textContent.trim().toLowerCase().replace(/\s+/g, '_');
-    hintBtn.disabled = true;
-    clearChat();
-    showMessage(li.textContent, 'user');
-    diffPromptMsg = showMessage('Select difficulty 👇', 'bot'); // запоминаем div
-    diffBox.style.display = 'flex';
+  if (!syllabusLoaded) return;
+  hideQuote();
+  li.classList.remove('has-new');
+
+  /* 1. подчёркиваем активную тему */
+  document.querySelectorAll('.sidebar li')
+          .forEach(e => e.classList.remove('active-topic'));
+  li.classList.add('active-topic');
+
+  /* 2. сохраняем DOM-историю прежней темы */
+  if (currentTopicKey) {
+    chats[currentTopicKey] = Array.from(
+      messagesBox.children,
+      el => el.outerHTML
+    );
+  }
+
+  /* 3. вычисляем новый ключ */
+  selectedTopic   = li.textContent.trim();
+  currentTopicKey = selectedTopic.toLowerCase().replace(/\s+/g, '_');
+
+  /* 4. вытаскиваем кэш-данные */
+  currentDifficulty = lastDifficulty[currentTopicKey] ?? null;
+  currentTaskRaw    = lastTasks[currentTopicKey]    ?? '';
+  hintBtn.disabled  = !currentTaskRaw;
+  submitCodeBtn.disabled = !currentTaskRaw;
+  diffBox.style.display  = 'flex';
+  /* 5. восстанавливаем или очищаем чат */
+  messagesBox.innerHTML = '';
+  if (chats[currentTopicKey]) {
+    messagesBox.innerHTML = chats[currentTopicKey].join('');
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  } else {
+    showMessage(selectedTopic, 'user');
+    if (!currentTaskRaw)
+      diffPromptMsg = showMessage('Select difficulty 👇', 'bot');
+  }
+
+  const hasTask = Boolean(lastTasks[currentTopicKey]);
+
+  submitCodeBtn.disabled = !hasTask;   // разрешаем «Send code», если задача есть
+  hintBtn.disabled       = !hasTask;   // то же для «Hint»
+  diffBox.style.display  = 'flex';  // изменила здесь
+
   };
+
 
   fetch('/get_syllabus')
     .then(r => (r.ok ? r.json() : null))
@@ -513,6 +589,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return showMessage('❗️ Please select topic first', 'bot');
     }
     currentDifficulty = level;
+    hintBtn.disabled = true;   // закрываем кнопку
+    attemptMade      = false;  // нет ещё попыток
+    const requestKey = currentTopicKey;
 
     if (diffPromptMsg) {
       diffPromptMsg.remove();
@@ -537,6 +616,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const taskObj = JSON.parse(json.task);
 
+      // Всегда сохраняем в общий кэш
+      lastTasks[requestKey]      = json.task;
+      lastDifficulty[requestKey] = level;
+
+      // Обновляем локальные переменные, только если пользователь всё ещё на этой теме
+      const isStillHere = currentTopicKey === requestKey;
+      if (isStillHere) {
+        currentTaskRaw = json.task;
+      }
+
+
       
       if (taskObj.Hints && typeof taskObj.Hints === 'object') {
         currentHints = [
@@ -557,64 +647,90 @@ document.addEventListener('DOMContentLoaded', () => {
         out += `• Input: ${input} → Expected: ${expected_output}\n`;
       });
 
-      showMessage(out, 'bot');
+      pushToChat(out, 'bot', requestKey);
+
+      if (!isStillHere) {
+        const li = [...document.querySelectorAll('#topics-list li')]
+                    .find(el => el.textContent.trim() === selectedTopic);
+        li && li.classList.add('has-new');   // CSS .has-new { font-weight:bold; }
+      }
+
+      if (isStillHere) {             // не трогаем чужую вкладку
+        submitCodeBtn.disabled = false;
+        hintBtn.disabled       = true;
+      }
+
       console.log('Parsed hints:', currentHints);
     } catch (err) {
       showMessage(`Error: ${err.message}`, 'bot');
     } finally {
       stopNotice();
     }
+    if (currentTopicKey === requestKey) {
+    submitCodeBtn.disabled = false;   // ← принудительно включаем
     hintBtn.disabled = true;
+ }
   };
 
-
   submitCodeBtn.addEventListener('click', async () => {
-    if (!syllabusLoaded) return;
-    if (!selectedTopic)
-      return showMessage('❗️ Please select topic before sending code', 'bot');
-    if (!currentDifficulty)
-      return showMessage('❗️ Please select difficulty before sending code', 'bot');
+  if (!selectedTopic) {
+    return showMessage('❗️ Please select topic first', 'bot');
+  }
 
-    const code = userInput.value.trim();
-    if (!code) return;
+  /* 1. “Фиксируем” всё, что относится к текущему топику —
+        дальше пользователь может уйти куда угодно, а мы работаем
+        с этими сохранёнными значениями. */
+  const requestKey   = currentTopicKey;          // snake_case ключ темы
+  const topicName    = selectedTopic;            //  название
+  const taskRaw      = lastTasks[requestKey];    // ← нужная задача
+  const diffToSend   = lastDifficulty[requestKey];
 
-    hideQuote();
-    showCodeMessage(code);        
-    hintBtn.disabled = false;
+  if (!taskRaw) {
+    return showMessage('❗️ First generate a task for this topic', 'bot');
+  }
 
-    const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
+  const code = userInput.value.trim();
+  if (!code) return;
+
+  /* 2. Печатаем код в нужной ветке чата */
+  pushUserCode(code, requestKey);
+
+  attemptMade      = true;   // теперь попытка есть
+  hintBtn.disabled = false;  // открываем подсказки
 
 
-    userInput.value = '';
-    userInput.style.height = 'auto';
+  /* 3. Готовим UI */
+  hintBtn.disabled = false;
+  userInput.value  = '';
+  userInput.style.height = 'auto';
+  const stopNotice = makeWaitingNotice('⏳ Checking your solution…');
 
-    try {
-      const respText = await fetchEval('/submit_code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: selectedTopic,
-          difficulty: currentDifficulty,
-          task:   currentTaskRaw,
-          code
-        })
-      });
+  /* 4. Отправляем на сервер ровно тот task, что лежит в кэше топика */
+  try {
+    const respText = await fetchEval('/submit_code', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({
+        topic      : topicName,
+        difficulty : diffToSend,
+        task       : taskRaw,        // ← главное изменение
+        code
+      })
+    });
 
-      showMessage(respText, 'bot');
-      if (respText.startsWith('✅')) {
-        solvedCount += 1;
-        saveScore();
-        updateScoreDisplay();
-      }
-    } catch (e) {
-      showMessage(`Error: ${e.message}`, 'bot');
-    } finally {
-      stopNotice();              
-    }
-  });
+    /* 5. Ответ кладём в нужный топик */
+    pushToChat(respText, 'bot', requestKey);
+
+  } catch (err) {
+    pushToChat(`Error: ${err.message}`, 'bot', requestKey);
+  } finally {
+    stopNotice();
+  }
+});
 
 
   hintBtn.addEventListener('click', () => {
+    if (!attemptMade) return showMessage('❗️ Send code first', 'bot'); // alert new
     if (!syllabusLoaded) return;
     if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
     if (!currentDifficulty) return showMessage('❗️ Please select difficulty first', 'bot');
