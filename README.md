@@ -33,7 +33,7 @@ Together this forms a lightweight learning‑platform experience without the ove
 | **Client**                                                       | Naveed Zafar                                         |
 | **Target Users**                                                 | University students taking *Programming in Python*   |
 | **External Services**                                            | • **DeepSeek** – task & hint generation              |                                                     
-|                                                                  | • **MySQL** – persistent user data & progress   |
+|                                                                  | • **SQLite** – persistent user data & progress   |
 |                                                                  | • **Email** – outbound reminders                     |
 
 ---
