@@ -774,6 +774,14 @@ document.addEventListener('DOMContentLoaded', () => {
     /* 5. Ответ кладём в нужный топик */
     pushToChat(respText, 'bot', requestKey);
 
+    // --- SCORE FIX: increment only if correct ---
+    if (respText && respText.startsWith('✅ Correct solution!')) {
+      solvedCount++;
+      saveScore();
+      updateScoreDisplay();
+    }
+    // --- END SCORE FIX ---
+
   } catch (err) {
     pushToChat(`Error: ${err.message}`, 'bot', requestKey);
   } finally {
