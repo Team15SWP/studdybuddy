@@ -594,3 +594,67 @@ button {
   background:#4ade80;
   transform:scale(1.05);
 }
+
+/* Notification Settings Styles */
+.notification-btn {
+  background: #4f46e5;
+  border: none;
+  padding: 8px 12px;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: .2s;
+  font-size: 16px;
+}
+
+.notification-btn:hover {
+  background: #6366f1;
+  transform: scale(1.05);
+}
+
+.notification-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-group label {
+  font-weight: 500;
+  color: #fff;
+}
+
+.setting-group input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.setting-group input[type="time"] {
+  background: #101015;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.day-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.day-checkboxes label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.day-checkboxes input[type="checkbox"] {
+  margin-right: 4px;
+}

@@ -6,4 +6,4 @@ bcrypt
 httpx
 pytest
 pydantic[email]
-python-jose
+python-jose[cryptography]

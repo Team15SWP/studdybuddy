@@ -12,6 +12,24 @@ services:
       - "8005"
     restart: always
 
+  notification:
+    build:
+      context: .
+      dockerfile: Dockerfile.notification
+    environment:
+      - ENV=${ENV:-local}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - APP_NAME=${APP_NAME}
+    volumes:
+      - ./users.db:/app/users.db
+    restart: unless-stopped
+    depends_on:
+      - app
+
   nginx:
     build:
       context: .

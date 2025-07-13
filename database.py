@@ -24,6 +24,16 @@ def init_db():
                 topic TEXT NOT NULL
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notification_settings (
+                user_id INTEGER PRIMARY KEY,
+                enabled BOOLEAN DEFAULT 1,
+                notification_time TEXT DEFAULT '09:00',
+                notification_days TEXT DEFAULT '1,2,3,4,5',
+                last_notification_date TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            )
+        """)
         conn.commit()
 
 def register_user(email, login, password):
@@ -117,3 +127,95 @@ def get_syllabus():
 
 def get_hint(topic: str, difficulty: str):
     return f"Hint for {topic} ({difficulty}): Consider using a loop or recursion."
+
+def get_notification_settings(user_id: int):
+    """Get notification settings for a user."""
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT enabled, notification_time, notification_days
+            FROM notification_settings
+            WHERE user_id = ?
+        """, (user_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            enabled, time, days = result
+            return {
+                "enabled": bool(enabled),
+                "notification_time": time,
+                "notification_days": days.split(",") if days else []
+            }
+        else:
+            # Return default settings if none exist
+            return {
+                "enabled": True,
+                "notification_time": "09:00",
+                "notification_days": ["1", "2", "3", "4", "5"]
+            }
+
+def update_notification_settings(user_id: int, enabled: bool, notification_time: str, notification_days: list):
+    """Update notification settings for a user."""
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        days_str = ",".join(map(str, notification_days))
+        
+        cursor.execute("""
+            INSERT OR REPLACE INTO notification_settings 
+            (user_id, enabled, notification_time, notification_days)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, enabled, notification_time, days_str))
+        conn.commit()
+
+def get_users_with_notifications_enabled():
+    """Get all users who have notifications enabled and should receive them now."""
+    from datetime import datetime, timedelta
+    
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    current_day = str(now.weekday() + 1)  # Monday=1, Sunday=7
+    
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT u.user_id, u.email, u.login, ns.notification_time, ns.notification_days
+            FROM users u
+            JOIN notification_settings ns ON u.user_id = ns.user_id
+            WHERE ns.enabled = 1
+        """)
+        
+        users = []
+        for row in cursor.fetchall():
+            user_id, email, login, notification_time, notification_days = row
+            days = notification_days.split(",") if notification_days else []
+            
+            # Check if user should receive notification now
+            if (current_time == notification_time and 
+                current_day in days and
+                (now - timedelta(days=1)).strftime("%Y-%m-%d") > get_last_notification_date(user_id)):
+                users.append((user_id, email, login))
+        
+        return users
+
+def get_last_notification_date(user_id: int):
+    """Get the last notification date for a user."""
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT last_notification_date
+            FROM notification_settings
+            WHERE user_id = ?
+        """, (user_id,))
+        result = cursor.fetchone()
+        return result[0] if result and result[0] else "1970-01-01"
+
+def update_last_notification_date(user_id: int):
+    """Update the last notification date for a user."""
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE notification_settings
+            SET last_notification_date = ?
+            WHERE user_id = ?
+        """, (datetime.now().strftime("%Y-%m-%d"), user_id))
+        conn.commit()

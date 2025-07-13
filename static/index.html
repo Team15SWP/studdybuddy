@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prosto+One&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 
 <body>
@@ -38,6 +38,7 @@
       <button id="score-btn" class="score-btn hidden">
         Score: <span id="score-count">0</span>
       </button>
+      <button id="notification-settings-btn" class="notification-btn hidden">🔔</button>
       <div id="user-avatar" class="user-avatar">👤</div>
       <div id="user-name" class="user-name"></div>
       <button id="logout-btn" class="logout">Log out</button>
@@ -125,9 +126,46 @@
   </div>
 </div>
 
+<!-- Notification Settings Modal -->
+<div id="notification-settings-modal" class="modal hidden">
+  <div class="modal-content">
+    <span id="notification-settings-close" class="modal-close">&times;</span>
+    <h2 style="text-align:center;margin-top:0">🔔 Notification Settings</h2>
+    
+    <form id="notification-settings-form" class="notification-form">
+      <div class="setting-group">
+        <label>
+          <input type="checkbox" id="notification-enabled" />
+          Enable notifications
+        </label>
+      </div>
+      
+      <div class="setting-group">
+        <label for="notification-time">Notification time:</label>
+        <input type="time" id="notification-time" value="09:00" />
+      </div>
+      
+      <div class="setting-group">
+        <label>Notification days:</label>
+        <div class="day-checkboxes">
+          <label><input type="checkbox" value="1" checked /> Mon</label>
+          <label><input type="checkbox" value="2" checked /> Tue</label>
+          <label><input type="checkbox" value="3" checked /> Wed</label>
+          <label><input type="checkbox" value="4" checked /> Thu</label>
+          <label><input type="checkbox" value="5" checked /> Fri</label>
+          <label><input type="checkbox" value="6" /> Sat</label>
+          <label><input type="checkbox" value="7" /> Sun</label>
+        </div>
+      </div>
+      
+      <button type="submit" class="login-submit">Save Settings</button>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
-<script src="/script.js" defer></script>
+<script src="/static/script.js" defer></script>
 </body>
 </html>

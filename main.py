@@ -7,6 +7,7 @@ from __future__ import annotations
 import sqlite3
 import bcrypt
 from pydantic import EmailStr
+from database import get_notification_settings, update_notification_settings
 
 from database import init_db
 
@@ -21,10 +22,11 @@ from typing import Any, Dict, List
 
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from jwt_utils import create_user_token, get_current_user
 
 # ---------------------------------------------------------------------------
 # Configuration & constants
@@ -316,6 +318,11 @@ class LoginInput(BaseModel):
     identifier: str  # can be email or login
     password: str
 
+class NotificationSettings(BaseModel):
+    enabled: bool
+    notification_time: str  # Format: "HH:MM"
+    notification_days: list[int]  # 1=Monday, 7=Sunday
+
 @app.post("/signup")
 async def signup(user: SignupInput):
     if not user.email.lower().endswith("@innopolis.university"):
@@ -347,18 +354,66 @@ async def login(data: LoginInput):
     with sqlite3.connect("users.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT login, password_hash FROM users WHERE LOWER(email) = ? OR LOWER(login) = ?",
+            "SELECT user_id, login, email, password_hash FROM users WHERE LOWER(email) = ? OR LOWER(login) = ?",
             (data.identifier.lower(), data.identifier.lower())
         )
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        login_name, password_hash = row
+        user_id, login_name, email, password_hash = row
         if not bcrypt.checkpw(data.password.encode(), password_hash.encode()):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        return {"name": login_name}
+        # Create JWT token
+        token = create_user_token(user_id, login_name, email)
+        
+        return {
+            "name": login_name,
+            "token": token,
+            "user_id": user_id
+        }
+
+# ---------------------------------------------------------------------------
+# Notification Settings Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/notification-settings")
+async def get_notification_settings_endpoint(current_user: dict = Depends(get_current_user)):
+    """Get notification settings for the current user."""
+    user_id = int(current_user["sub"])
+    settings = get_notification_settings(user_id)
+    return settings
+
+@app.post("/notification-settings")
+async def update_notification_settings_endpoint(
+    settings: NotificationSettings,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update notification settings for the current user."""
+    user_id = int(current_user["sub"])
+    
+    # Validate time format
+    try:
+        hour, minute = map(int, settings.notification_time.split(":"))
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError("Invalid time format")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+    
+    # Validate days
+    for day in settings.notification_days:
+        if not (1 <= day <= 7):
+            raise HTTPException(status_code=400, detail="Invalid day. Use 1-7 (Monday=1, Sunday=7)")
+    
+    update_notification_settings(
+        user_id,
+        settings.enabled,
+        settings.notification_time,
+        settings.notification_days
+    )
+    
+    return {"message": "Notification settings updated successfully"}
 
 # ---------------------------------------------------------------------------
 # Entry point (for `python main.py`)
