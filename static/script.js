@@ -14,14 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   adminBanner.classList.add('hidden');
 
   const showChatUi = () => {
-    // Check if user is logged in
-    const isLoggedIn = localStorage.getItem('pp_loggedIn') === 'true';
-    if (!isLoggedIn) {
-      // Show login modal instead of chat UI
-      openModal();
-      return;
-    }
-    
+    // Always open chat UI, no login check here!
     homepage.classList.add('animate-out');
     homepage.addEventListener('animationend', () => {
       homepage.classList.add('hidden');
@@ -134,9 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const userName = localStorage.getItem('pp_userName') || 'User';
       const isAdmin = localStorage.getItem('pp_isAdmin') === 'true';
       finishLogin(userName, isAdmin);
-    } else {
-      // If not logged in, show login modal immediately
-      openModal();
     }
   };
 
