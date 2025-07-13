@@ -14,6 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
   adminBanner.classList.add('hidden');
 
   const showChatUi = () => {
+    // Check if user is logged in
+    const isLoggedIn = localStorage.getItem('pp_loggedIn') === 'true';
+    if (!isLoggedIn) {
+      // Show login modal instead of chat UI
+      openModal();
+      return;
+    }
+    
     homepage.classList.add('animate-out');
     homepage.addEventListener('animationend', () => {
       homepage.classList.add('hidden');
@@ -118,6 +126,19 @@ document.addEventListener('DOMContentLoaded', () => {
   hintBtn.disabled         = true;
   topicsList.innerHTML     = '';
   topicsList.style.display = 'none';
+
+  // Restore login state from localStorage
+  const restoreLoginState = () => {
+    const isLoggedIn = localStorage.getItem('pp_loggedIn') === 'true';
+    if (isLoggedIn) {
+      const userName = localStorage.getItem('pp_userName') || 'User';
+      const isAdmin = localStorage.getItem('pp_isAdmin') === 'true';
+      finishLogin(userName, isAdmin);
+    } else {
+      // If not logged in, show login modal immediately
+      openModal();
+    }
+  };
 
   const noTopicsMsg = document.createElement('div');
   noTopicsMsg.textContent = '⏳ Please wait until the administrator uploads the syllabus 😔';
@@ -247,6 +268,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const handleTopic = li => {
+  // Check if user is logged in before allowing topic selection
+  const isLoggedIn = localStorage.getItem('pp_loggedIn') === 'true';
+  if (!isLoggedIn) {
+    showMessage('❗️ Please log in to use the bot', 'bot');
+    openModal();
+    return;
+  }
+  
   if (!syllabusLoaded) return;
   hideQuote();
   li.classList.remove('has-new');
@@ -456,6 +485,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.style.display   = 'none';
     adminBanner.classList.toggle('hidden', !admin);
 
+    // Save login state to localStorage
+    localStorage.setItem('pp_loggedIn', 'true');
+    localStorage.setItem('pp_userName', name);
+    localStorage.setItem('pp_isAdmin', admin.toString());
+
     if (admin && !syllabusLoaded) {
       uploadBtn.style.display = 'block';
     } else {
@@ -499,6 +533,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!syllabusLoaded) noTopicsMsg.style.display = 'block';
     adjustLayoutHeight();
     scoreBtn.classList.add('hidden');
+    
+    // Clear login state from localStorage
+    localStorage.removeItem('pp_loggedIn');
+    localStorage.removeItem('pp_userName');
+    localStorage.removeItem('pp_isAdmin');
   });
 
   uploadBtn.addEventListener('click', () => fileInput.click());
@@ -583,6 +622,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.chooseDifficulty = async level => {
+    // Check if user is logged in before allowing difficulty selection
+    const isLoggedIn = localStorage.getItem('pp_loggedIn') === 'true';
+    if (!isLoggedIn) {
+      showMessage('❗️ Please log in to use the bot', 'bot');
+      openModal();
+      return;
+    }
+    
     if (!syllabusLoaded) return;
     hideQuote();
     if (!selectedTopic) {
@@ -673,6 +720,14 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   submitCodeBtn.addEventListener('click', async () => {
+  // Check if user is logged in before allowing code submission
+  const isLoggedIn = localStorage.getItem('pp_loggedIn') === 'true';
+  if (!isLoggedIn) {
+    showMessage('❗️ Please log in to use the bot', 'bot');
+    openModal();
+    return;
+  }
+  
   if (!selectedTopic) {
     return showMessage('❗️ Please select topic first', 'bot');
   }
@@ -730,6 +785,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   hintBtn.addEventListener('click', () => {
+    // Check if user is logged in before allowing hints
+    const isLoggedIn = localStorage.getItem('pp_loggedIn') === 'true';
+    if (!isLoggedIn) {
+      showMessage('❗️ Please log in to use the bot', 'bot');
+      openModal();
+      return;
+    }
     if (!attemptMade) return showMessage('❗️ Send code first', 'bot'); // alert new
     if (!syllabusLoaded) return;
     if (!selectedTopic) return showMessage('❗️ Please select topic first', 'bot');
@@ -758,5 +820,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hintBtn.disabled) showHintTip('❗️ Send code to get a hint');
   });
 
+  // Restore login state on page load
+  restoreLoginState();
+  
   adjustLayoutHeight();
 });
