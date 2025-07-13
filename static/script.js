@@ -409,6 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const data = await res.json();
       finishLogin(data.name || name, false);
+      if (data.token) localStorage.setItem('pp_token', data.token); // Save token after signup
       closeModal();
     } catch (e2) {
       showSuErr(`Network error: ${e2.message}`);
@@ -437,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const data = await res.json();
       finishLogin(data.name, false);
+      if (data.token) localStorage.setItem('pp_token', data.token); // Save token after login
     } catch (err) {
       loginError.textContent = `Error: ${err.message}`;
     }
@@ -471,6 +473,8 @@ document.addEventListener('DOMContentLoaded', () => {
     isAdmin = admin;
     profileDiv.style.display = 'flex';
     logoutBtn.style.display  = 'inline-block';
+    notificationSettingsBtn.classList.remove('hidden');
+    notificationSettingsBtn.style.display = 'inline-block';
     userNameSp.textContent   = name;
     loginBtn.style.display   = 'none';
     adminBanner.classList.toggle('hidden', !admin);
@@ -507,6 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (admin && !syllabusLoaded) noTopicsMsg.style.display = 'none';
     scoreBtn.classList.remove('hidden');
+    notificationSettingsBtn.classList.remove('hidden'); // <-- Show bell after login
     loadScore()
     closeModal();
     adjustLayoutHeight();
@@ -516,6 +521,8 @@ document.addEventListener('DOMContentLoaded', () => {
     isAdmin = false;
     profileDiv.style.display = 'none';
     logoutBtn.style.display  = 'none';
+    notificationSettingsBtn.classList.add('hidden');
+    notificationSettingsBtn.style.display = 'none';
     loginBtn.style.display   = 'inline-block';
     adminBanner.classList.add('hidden');
     uploadBtn.style.display  = 'none';
@@ -523,7 +530,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!syllabusLoaded) noTopicsMsg.style.display = 'block';
     adjustLayoutHeight();
     scoreBtn.classList.add('hidden');
-    
+    notificationSettingsBtn.classList.add('hidden'); // <-- Hide bell after logout
+    localStorage.removeItem('pp_token'); // Remove token on logout
     // Clear login state from localStorage
     localStorage.removeItem('pp_loggedIn');
     localStorage.removeItem('pp_userName');
@@ -808,6 +816,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
   hintHelp.addEventListener('click', () => {
     if (hintBtn.disabled) showHintTip('❗️ Send code to get a hint');
+  });
+
+  // Notification Settings Modal logic
+  const notificationSettingsBtn = document.getElementById('notification-settings-btn');
+  const notificationSettingsModal = document.getElementById('notification-settings-modal');
+  const notificationSettingsClose = document.getElementById('notification-settings-close');
+  const notificationSettingsForm = document.getElementById('notification-settings-form');
+  const notificationEnabled = document.getElementById('notification-enabled');
+  const notificationTime = document.getElementById('notification-time');
+  const notificationDays = document.querySelectorAll('.day-checkboxes input[type="checkbox"]');
+
+  // Show modal on bell click
+  notificationSettingsBtn.addEventListener('click', () => {
+    notificationSettingsModal.classList.remove('hidden');
+    loadNotificationSettings();
+  });
+  notificationSettingsClose.addEventListener('click', () => {
+    notificationSettingsModal.classList.add('hidden');
+  });
+
+  // Load settings from backend
+  async function loadNotificationSettings() {
+    try {
+      const token = localStorage.getItem('pp_token');
+      if (!token) return;
+      const res = await fetch('/notification-settings', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const settings = await res.json();
+        notificationEnabled.checked = settings.enabled;
+        notificationTime.value = settings.notification_time;
+        notificationDays.forEach(cb => {
+          cb.checked = settings.notification_days.includes(cb.value);
+        });
+      }
+    } catch (e) {
+      // Optionally show error
+    }
+  }
+
+  // Save settings to backend
+  notificationSettingsForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    console.log('Notification settings form submitted!');
+    const token = localStorage.getItem('pp_token');
+    if (!token) return;
+    const days = Array.from(notificationDays).filter(cb => cb.checked).map(cb => parseInt(cb.value));
+    const settings = {
+      enabled: notificationEnabled.checked,
+      notification_time: notificationTime.value,
+      notification_days: days
+    };
+    try {
+      const res = await fetch('/notification-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(settings)
+      });
+      if (res.ok) {
+        notificationSettingsModal.classList.add('hidden');
+        showMessage('✅ Notification settings saved!', 'bot');
+      } else {
+        const err = await res.json();
+        showMessage(`❌ ${err.detail || 'Error saving settings'}`, 'bot');
+      }
+    } catch (e) {
+      showMessage('❌ Network error', 'bot');
+    }
   });
 
   // Restore login state on page load

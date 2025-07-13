@@ -27,6 +27,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from jwt_utils import create_user_token, get_current_user
+import smtplib
+from email.mime.text import MIMEText
 
 # ---------------------------------------------------------------------------
 # Configuration & constants
@@ -414,6 +416,34 @@ async def update_notification_settings_endpoint(
     )
     
     return {"message": "Notification settings updated successfully"}
+
+@app.post("/send-notification")
+async def send_notification(current_user: dict = Depends(get_current_user)):
+    user_email = current_user.get("email")
+    user_name = current_user.get("username")
+    if not user_email:
+        raise HTTPException(status_code=400, detail="No email found for user")
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USERNAME")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    from_email = os.getenv("FROM_EMAIL", smtp_user)
+    app_name = os.getenv("APP_NAME", "Study Buddy")
+
+    msg = MIMEText(f"Hi {user_name}! This is your notification from {app_name}.")
+    msg["Subject"] = f"{app_name} Notification"
+    msg["From"] = from_email
+    msg["To"] = user_email
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(from_email, [user_email], msg.as_string())
+        return {"message": f"Notification sent to {user_email}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
 
 # ---------------------------------------------------------------------------
 # Entry point (for `python main.py`)
