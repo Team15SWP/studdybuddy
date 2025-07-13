@@ -86,7 +86,21 @@ Together this forms a lightweight learning‑platform experience without the ove
 
    1. Upload or edit the course syllabus.
 ---
-
+## Documentation
+### [Changelog](https://github.com/Team15SWP/studdybuddy/blob/main/CHANGELOG.md)
+### [Development](https://github.com/Team15SWP/studdybuddy/blob/main/CONTRIBUTING.md) 
+### [Quality attribute scenarios](https://github.com/Team15SWP/studdybuddy/blob/main/docs/quality-attributes/quality-attribute-scenarios.md)
+### Quality assurance
+- [Automated tests](https://github.com/Team15SWP/studdybuddy/blob/main/docs/quality-assurance/automated-tests.md)
+- [User acceptance tests](https://github.com/Team15SWP/studdybuddy/blob/main/docs/quality-assurance/user-acceptance-tests.md)
+### Build and deployment automation
+- [Continuous Integration](https://github.com/Team15SWP/studdybuddy/blob/main/docs/automation/continuous-integration.md)
+- [Continuous Deployment](https://github.com/Team15SWP/studdybuddy/blob/main/docs/automation/continuous-delivery.md)
+### Architecture
+- [Static view](https://github.com/Team15SWP/studdybuddy/blob/main/docs/architecture/static-view.md) 
+- [Dynamic view](https://github.com/Team15SWP/studdybuddy/blob/main/docs/architecture/dynamic-view.md)
+- [Deployment view](https://github.com/Team15SWP/studdybuddy/blob/main/docs/architecture/deployment-view.md)
+- [Tech Stack](https://github.com/Team15SWP/studdybuddy/blob/main/docs/architecture/architecture.md)
 ## Installation & Run (Developers)
 
 > Requires **Python 3.11+**.
@@ -122,4 +136,5 @@ uvicorn main:app --reload --port 8005
 docker compose up --build
 ```
 ---
-
+## Licence 
+See [LICENSE.txt](https://github.com/Team15SWP/studdybuddy/blob/main/LICENSE) for information.
