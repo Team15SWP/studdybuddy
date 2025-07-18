@@ -1,9 +1,12 @@
 import sqlite3
 import bcrypt
 from datetime import datetime, timedelta
+import os
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'users.db')
 
 def init_db():
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -44,7 +47,7 @@ def register_user(email, login, password):
         raise ValueError("Password must be at least 6 characters long")
 
     try:
-        with sqlite3.connect("users.db") as conn:
+        with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
 
             cursor.execute("SELECT 1 FROM users WHERE LOWER(email) = LOWER(?)", (email,))
@@ -67,7 +70,7 @@ def register_user(email, login, password):
         raise ValueError("User already exists")
 
 def login_user(identifier, password):
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -88,7 +91,7 @@ def login_user(identifier, password):
         return {"user_id": user_id, "name": login}
 
 def update_score(user_id, points):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     now = datetime.now().isoformat()
     cursor.execute("""
@@ -100,7 +103,7 @@ def update_score(user_id, points):
     conn.close()
 
 def get_inactive_users():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     yesterday = (datetime.now() - timedelta(days=1)).isoformat()
     cursor.execute("""
@@ -112,7 +115,7 @@ def get_inactive_users():
     return inactive_users
 
 def save_syllabus(topics: list):
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM syllabus")
         for topic in topics:
@@ -120,7 +123,7 @@ def save_syllabus(topics: list):
         conn.commit()
 
 def get_syllabus():
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT topic FROM syllabus")
         return [row[0] for row in cursor.fetchall()]
@@ -130,7 +133,7 @@ def get_hint(topic: str, difficulty: str):
 
 def get_notification_settings(user_id: int):
     """Get notification settings for a user."""
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT enabled, notification_time, notification_days
@@ -156,7 +159,7 @@ def get_notification_settings(user_id: int):
 
 def update_notification_settings(user_id: int, enabled: bool, notification_time: str, notification_days: list):
     """Update notification settings for a user."""
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         days_str = ",".join(map(str, notification_days))
         
@@ -175,7 +178,7 @@ def get_users_with_notifications_enabled():
     current_time = now.strftime("%H:%M")
     current_day = str(now.weekday() + 1)  # Monday=1, Sunday=7
     
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT u.user_id, u.email, u.login, ns.notification_time, ns.notification_days
@@ -199,7 +202,7 @@ def get_users_with_notifications_enabled():
 
 def get_last_notification_date(user_id: int):
     """Get the last notification date for a user."""
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT last_notification_date
@@ -211,7 +214,7 @@ def get_last_notification_date(user_id: int):
 
 def update_last_notification_date(user_id: int):
     """Update the last notification date for a user."""
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE notification_settings

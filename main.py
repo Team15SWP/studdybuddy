@@ -57,6 +57,7 @@ REQUEST_TIMEOUT: int = 30  # seconds for the HTTP call to OpenRouter
 # Files & dirs
 BASE_DIR: Path = Path(__file__).parent
 SYLLABUS_FILE: Path = BASE_DIR / "syllabus.json"
+DB_PATH = str(BASE_DIR / "users.db")
 
 # Logging
 logger = logging.getLogger("app")
@@ -346,7 +347,7 @@ async def signup(user: SignupInput):
         raise HTTPException(status_code=400, detail="Only @innopolis.university emails allowed")
 
     try:
-        with sqlite3.connect("users.db") as conn:
+        with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT 1 FROM users WHERE LOWER(email) = ?", (user.email.lower(),))
             if cursor.fetchone():
@@ -368,7 +369,7 @@ async def signup(user: SignupInput):
 
 @app.post("/login")
 async def login(data: LoginInput):
-    with sqlite3.connect("users.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT user_id, login, email, password_hash FROM users WHERE LOWER(email) = ? OR LOWER(login) = ?",

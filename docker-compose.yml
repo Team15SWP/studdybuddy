@@ -12,6 +12,8 @@ services:
     expose:
       - "8005"
     restart: always
+    volumes:
+      - ./users.db:/app/users.db
 
   nginx:
     build:
