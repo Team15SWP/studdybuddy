@@ -7,8 +7,4 @@ httpx
 pytest
 pydantic[email]
 python-jose[cryptography]
-<<<<<<< HEAD
 apscheduler
-=======
-apscheduler
->>>>>>> da58d63 (..)
