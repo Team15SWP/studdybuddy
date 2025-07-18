@@ -29,6 +29,15 @@ from pydantic import BaseModel
 from jwt_utils import create_user_token, get_current_user
 import smtplib
 from email.mime.text import MIMEText
+from apscheduler.schedulers.background import BackgroundScheduler
+from database import get_users_with_notifications_enabled, update_last_notification_date
+import atexit
+
+def scheduled_notifications_job():
+    users = get_users_with_notifications_enabled()
+    for user_id, email, login in users:
+        send_email_notification(email, login)
+        update_last_notification_date(user_id)
 
 # ---------------------------------------------------------------------------
 # Configuration & constants
@@ -135,6 +144,12 @@ app = FastAPI(title="Coding Tasks API")
 # for creating an user table
 init_db() 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# --- APScheduler setup ---
+scheduler = BackgroundScheduler()
+scheduler.add_job(scheduled_notifications_job, 'interval', minutes=1)
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
 
 # ---------------------------------------------------------------------------
 # Models
@@ -444,6 +459,29 @@ async def send_notification(current_user: dict = Depends(get_current_user)):
         return {"message": f"Notification sent to {user_email}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
+
+def send_email_notification(user_email, user_name):
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USERNAME")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    from_email = os.getenv("FROM_EMAIL", smtp_user)
+    app_name = os.getenv("APP_NAME", "Study Buddy")
+
+    msg = MIMEText(f"Hi {user_name}! This is your notification from {app_name}.")
+    msg["Subject"] = f"{app_name} Notification"
+    msg["From"] = from_email
+    msg["To"] = user_email
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(from_email, [user_email], msg.as_string())
+        logger.info(f"Notification sent to {user_email}")
+    except Exception as e:
+        logger.error(f"Failed to send email to {user_email}: {e}")
+
 
 # ---------------------------------------------------------------------------
 # Entry point (for `python main.py`)
