@@ -6,7 +6,7 @@
 
 |                | Link  |
 | -------------- | ----- |
-| **Live App**   | http://194.31.174.125/ |
+| **Live App**   | http://uchipython.duckdns.org/ |
 | **Demo Video** | https://disk.yandex.ru/i/kHkq3orwnzELYw |
 
 ---
