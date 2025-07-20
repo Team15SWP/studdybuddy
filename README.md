@@ -72,7 +72,7 @@ Together this forms a lightweight learning‑platform experience without the ove
 
 ## Quick‑Start for Users
 
-1. **Visit the app** → *http://194.31.174.125/*.
+1. **Visit the app** → *http://uchipython.duckdns.org/*.
 2. **Sign Up / Log In**: email + password.
    *Admin?* Click *“Admin Login”* and enter password.
 3. **Students**:
