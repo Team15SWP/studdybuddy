@@ -101,6 +101,9 @@ Together this forms a lightweight learning‑platform experience without the ove
 - [Dynamic view](https://github.com/Team15SWP/studdybuddy/blob/main/docs/architecture/dynamic-view.md)
 - [Deployment view](https://github.com/Team15SWP/studdybuddy/blob/main/docs/architecture/deployment-view.md)
 - [Tech Stack](https://github.com/Team15SWP/studdybuddy/blob/main/docs/architecture/architecture.md)
+## For customer
+- [LLM model details] (https://github.com/Team15SWP/studdybuddy/blob/main/docs/for-customer/LLM-model-details.md)
+- [Prompt engeneering process] (https://github.com/Team15SWP/studdybuddy/blob/main/docs/for-customer/prompt-engeneering-process.md)
 ## Installation & Run (Developers)
 
 > Requires **Python 3.11+**.
