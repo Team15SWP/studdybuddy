@@ -1,4 +1,4 @@
-# StudyBuddy 🐍
+# StudyBuddy ![Study Buddy Logo](./logo.png)
 
 **StudyBuddy** is a web‑based AI chatbot that ingests your Python‑course syllabus, generates leveled coding challenges, checks solutions, hints when you’re stuck, and keeps you on track with customizable notifications.
 
